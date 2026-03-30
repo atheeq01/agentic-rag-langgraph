@@ -1,0 +1,25 @@
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+from app.model.user import User
+from app.core.security import hash_password, verify_password, create_access_token
+
+
+def create_user(db: Session, email: str, password: str, full_name: str | None = None, role: str = "employee"):
+    hashed_password = hash_password(password)
+    user = User(email=email, password=hashed_password, full_name=full_name, role=role)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+def authenticate_user(db: Session, email: str, password: str):
+    stmt = select(User).where(User.email == email)
+    user = db.scalar(stmt)
+
+    if not user or not verify_password(password, user.password_hash):
+        return None
+    return user
+
+def create_user_token(user):
+    data = {"sub": str(user.id), "role": user.role}
+    return create_access_token(data)
