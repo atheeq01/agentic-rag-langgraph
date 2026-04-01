@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    DB_URI: str
+    DATABASE_URL: str
 
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
@@ -14,5 +14,5 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
-SETTINGS = Settings()
+settings = Settings()
 

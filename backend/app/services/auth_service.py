@@ -1,12 +1,12 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from app.model.user import User
+from app.models.user import User
 from app.core.security import hash_password, verify_password, create_access_token
 
 
 def create_user(db: Session, email: str, password: str, full_name: str | None = None, role: str = "employee"):
     hashed_password = hash_password(password)
-    user = User(email=email, password=hashed_password, full_name=full_name, role=role)
+    user = User(email=email, password_hash=hashed_password, full_name=full_name, role=role)
     db.add(user)
     db.commit()
     db.refresh(user)
