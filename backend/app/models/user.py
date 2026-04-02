@@ -25,3 +25,19 @@ class User(Base):
         "Leave",
         back_populates="approver",
         foreign_keys="[Leave.approved_by]")
+    chat_sessions = relationship(
+        "ChatSession",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    complaints_filed = relationship(
+        "Complaint",
+        back_populates="user",
+        foreign_keys="[Complaint.user_id]"
+    )
+
+    complaints_received = relationship(
+        "Complaint",
+        back_populates="against_user",
+        foreign_keys="[Complaint.against_user_id]"
+    )
