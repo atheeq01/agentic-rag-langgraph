@@ -13,7 +13,7 @@ from app.models.user import User
 router = APIRouter(prefix="/complaints", tags=["Complaints"])
 
 
-@router.post("/", response_model=ComplaintCreate)
+@router.post("/", response_model=ComplaintOut)
 def create(data: ComplaintCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return complaint_service.create_complaint(db, current_user.id, data)
 
