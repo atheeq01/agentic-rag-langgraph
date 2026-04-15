@@ -23,3 +23,12 @@ def authenticate_user(db: Session, email: str, password: str):
 def create_user_token(user):
     data = {"sub": str(user.id), "role": user.role}
     return create_access_token(data)
+
+def delete_user(db, user_id):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None
+
+    db.delete(user)
+    db.commit()
+    return True

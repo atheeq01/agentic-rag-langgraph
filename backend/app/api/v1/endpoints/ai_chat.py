@@ -9,6 +9,7 @@ from app.schemas.chat import ChatMessageCreate, ChatMessageOut, ChatSessionOut, 
 from app.services import chat_service
 from app.models.chat import ChatSession
 from app.models.user import User
+from app.ai.orchestrator import run_chat
 
 router = APIRouter(prefix="/ai", tags=["AI Chat"])
 
@@ -54,7 +55,19 @@ def send_message(
         ChatSession.user_id == current_user.id)
     if not db.scalar(stmt):
         raise HTTPException(status_code=404, detail="Session not found")
-    return chat_service.add_message(db, message_in)
+    chat_service.add_message(db, message_in)
+    ai_response_text = run_chat(
+        user_input=message_in.content,
+        user=current_user,
+        session_id=message_in.session_id
+    )
+    ai_message_data = ChatMessageCreate(
+        session_id=message_in.session_id,
+        role="assistant",
+        content=ai_response_text
+    )
+    ai_message_db = chat_service.add_message(db, ai_message_data)
+    return ai_message_db
 
 # Provide feedback on a message
 @router.post("/messages/{message_id}/feedback")

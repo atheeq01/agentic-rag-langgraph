@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from app.schemas.auth import UserCreate, UserLogin, Token
 from app.db.session import get_db
@@ -49,3 +50,19 @@ def get_my_profile(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "role": current_user.role
     }
+
+@router.delete("/users/{user_id}")
+def delete_user_api(
+    user_id: UUID,   # ✅ FIXED
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    deleted = auth_service.delete_user(db, user_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"message": "User deleted successfully"}
