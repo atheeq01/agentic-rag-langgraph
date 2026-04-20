@@ -31,11 +31,17 @@ def team_leaves(status: str | None = None, db: Session = Depends(get_db),
 
 
 @router.post("/{leave_id}/action", response_model=LeaveOut)
-def action_leave(leave_id: UUID, approve: bool, db: Session = Depends(get_db),
-                 current_user: User = Depends(get_current_user)):
+def action_leave(
+    leave_id: UUID,
+    approve: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     require_role(current_user.role, [ROLE_MANAGER, ROLE_HR, ROLE_ADMIN])
 
     leave = leave_service.approve_leave(db, leave_id, current_user.id, approve)
+
     if not leave:
         raise HTTPException(status_code=404, detail="Leave not found")
+
     return leave
