@@ -2,7 +2,11 @@ import bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import jwt, JWTError
+from cryptography.fernet import Fernet, InvalidToken
 from app.core.config import settings
+
+
+cipher_suite = Fernet(settings.ENCRYPTION_KEY.encode())
 
 def hash_password(password: str) -> str:
     # bcrypt requires passwords to be encoded as bytes before hashing
@@ -29,3 +33,20 @@ def decode_access_token(token: str):
         return payload
     except JWTError:
         return None
+
+def encrypt_token(token: str) -> str:
+    """Encrypts a plaintext token for secure database storage."""
+    if not token:
+        return None
+    encrypted_bytes = cipher_suite.encrypt(token.encode('utf-8'))
+    return encrypted_bytes.decode('utf-8')
+
+def decrypt_token(encrypted_token: str) -> str:
+    """Decrypts a stored token for API usage."""
+    if not encrypted_token:
+        return None
+    try:
+        decrypted_bytes = cipher_suite.decrypt(encrypted_token.encode('utf-8'))
+        return decrypted_bytes.decode('utf-8')
+    except InvalidToken:
+        raise ValueError("Decryption failed. The encryption key may have changed.")

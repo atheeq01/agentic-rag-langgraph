@@ -2,7 +2,7 @@ import traceback
 from app.ai.rag.vector_store import vector_store
 
 
-def retrieve_docs(query: str, k: int = 3) -> str:
+def retrieve_docs(query: str, user_role: str, k: int = 3) -> str:
     """
     Searches the Pinecone vector database for relevant HR policy documents.
 
@@ -12,9 +12,16 @@ def retrieve_docs(query: str, k: int = 3) -> str:
 
     Returns:
         str: A formatted string of the retrieved document chunks.
+        :param k:
+        :param query:
+        :param user_role:
     """
     try:
-        print(f"[Retriever] Searching for: '{query}' (k={k})")
+        print(f"[Retriever] Searching for: '{query}' (k={k}, role={user_role})")
+
+        search_kwargs = {"k": k}
+        if user_role not in ["admin", "hr"]:
+            search_kwargs["filter"] = {"allowed_roles": {"$in": [user_role, "all"]}}
 
         # Perform similarity search using the vector store
         docs = vector_store.similarity_search(query, k=k)

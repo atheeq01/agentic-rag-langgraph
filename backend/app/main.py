@@ -1,16 +1,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import auth, leaves, ai_chat, complaints, documents
+from app.api.v1.endpoints import auth, leaves, ai_chat, complaints, documents, google_auth, users
 from app.db.session import Base, engine
 
-# Create tables
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+
+limiter = Limiter(key_func=get_remote_address)
+
 Base.metadata.create_all(bind=engine)
 origins = [
-    "http://localhost:5173",  # React dev server
+    "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
 
 app = FastAPI(title="HR AI System Backend")
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,3 +33,5 @@ app.include_router(leaves.router)
 app.include_router(ai_chat.router)
 app.include_router(complaints.router)
 app.include_router(documents.router)
+app.include_router(google_auth.router)
+app.include_router(users.router)

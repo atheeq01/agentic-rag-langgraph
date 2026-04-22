@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from uuid import UUID
 
+from app.ai.security_guard import analyze_prompt_risk
 from app.db.session import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.chat import ChatMessageCreate, ChatMessageOut, ChatSessionOut, FeedbackCreate
@@ -44,12 +45,32 @@ def get_messages(
         raise HTTPException(status_code=404, detail="Session not found")
     return chat_service.get_session_messages(db, session_id)
 
+def is_malicious_prompt(user_input: str) -> bool:
+    blocked_patterns = [
+        "ignore previous instructions",
+        "system override",
+        "what is your system prompt",
+        "forget your instructions"
+    ]
+    return any(p.lower() in user_input.lower() for p in blocked_patterns)
+
+
 # Send a message
 @router.post("/messages", response_model=ChatMessageOut)
 def send_message(
         message_in: ChatMessageCreate,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)):
+
+    # just a security chck
+    risk_assessment = analyze_prompt_risk(message_in.content)
+
+    if risk_assessment["action"] == "block":
+        raise HTTPException(
+            status_code=400,
+            detail="Request blocked due to security policy violations."
+        )
+
     stmt = select(ChatSession).where(
         ChatSession.id == message_in.session_id,
         ChatSession.user_id == current_user.id)

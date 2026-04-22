@@ -11,7 +11,7 @@ from langgraph.graph.message import add_messages
 from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from app.ai.prompts import LEAVE_PROMPT, COMPLAINT_PROMPT, HR_PROMPT
+from app.ai.prompts import LEAVE_PROMPT, COMPLAINT_PROMPT, HR_PROMPT, COMMON_AGENT_PROMPT
 from app.ai.router.hybrid_router import semantic_router
 
 from app.ai.tools.hr_tools import (
@@ -32,7 +32,7 @@ if not API_KEY:
 
 # Use the fastest available model (no thinking overhead)
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-3.1-flash-lite-preview",
     temperature=0.2,
     timeout=30,
 )
@@ -70,7 +70,12 @@ def extract_text(content) -> str:
 # ──────────────── TOOL-BOUND LLMs ────────────────
 leave_llm = llm.bind_tools([check_sql_leave_balance, apply_leave_tool, draft_and_send_email, get_current_date])
 complaint_llm = llm.bind_tools([submit_formal_complaint, check_sql_leave_balance])
-hr_llm = llm.bind_tools([hr_vector_search])
+hr_llm = llm.bind_tools([hr_vector_search,draft_and_send_email])
+common_llm = llm.bind_tools([
+    check_sql_leave_balance,
+    draft_and_send_email,
+    get_current_date
+])
 
 
 # ──────────────── TOOL EXECUTOR ────────────────
@@ -131,6 +136,18 @@ def _run_agent_loop(state: State, bound_llm, base_prompt: str, tool_map: dict, m
 
     return {"messages": all_new_messages}
 
+# ──────────────── AGENT NODES ────────────────
+
+def run_common_agent(state: State):
+    print("[Common Agent] Handling general utility task...")
+    return _run_agent_loop(
+        state, common_llm, COMMON_AGENT_PROMPT,
+        tool_map={
+            "check_sql_leave_balance": check_sql_leave_balance,
+            "draft_and_send_email": draft_and_send_email,
+            "get_current_date": get_current_date,
+        },
+    )
 
 # ──────────────── AGENT NODES ────────────────
 def run_leave_agent(state: State):
@@ -163,6 +180,7 @@ def run_hr_agent(state: State):
         state, hr_llm, HR_PROMPT,
         tool_map={
             "hr_vector_search": hr_vector_search,
+            "draft_and_send_email": draft_and_send_email
         },
     )
 
@@ -171,12 +189,14 @@ def run_hr_agent(state: State):
 builder = StateGraph(State)
 
 builder.add_node("router", semantic_router)
+builder.add_node("common_agent", run_common_agent)
 builder.add_node("leave_agent", run_leave_agent)
 builder.add_node("complaint_agent", run_complaint_agent)
 builder.add_node("hr_agent", run_hr_agent)
 
 builder.add_edge(START, "router")
-# Agent nodes go straight to END (tool loops handled internally)
+
+builder.add_edge("common_agent", END)
 builder.add_edge("leave_agent", END)
 builder.add_edge("complaint_agent", END)
 builder.add_edge("hr_agent", END)

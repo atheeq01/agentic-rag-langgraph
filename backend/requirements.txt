@@ -20,3 +20,5 @@ langgraph
 pinecone-client
 pypdf
 pytest
+cryptography
+httpx
