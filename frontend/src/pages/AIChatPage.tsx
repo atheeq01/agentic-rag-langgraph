@@ -1,0 +1,392 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Bot, User, Send, Paperclip, CheckCircle2, Loader2, Plus, MessageSquare, X } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
+
+type Message = { id: string; role: 'user' | 'agent'; content: string; timestamp: string; citations?: string[] };
+
+const WELCOME_MSG: Message = {
+  id: 'welcome',
+  role: 'agent',
+  content: 'Hello! I am the AI HR Agent. How can I assist you with company policies, leave, or general HR inquiries today?',
+  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+};
+
+export default function AIChatPage() {
+  const [input, setInput] = useState('');
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MSG]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loadingHistory]);
+
+  // Fetch all sessions for sidebar
+  const { data: sessions, isLoading: loadingSessions } = useQuery({
+    queryKey: ['ai-sessions'],
+    queryFn: () => api.get('/ai/sessions').then(res => res.data)
+  });
+
+  // Load a session's message history
+  const loadSessionMessages = useCallback(async (sid: string) => {
+    setLoadingHistory(true);
+    try {
+      const res = await api.get(`/ai/sessions/${sid}/messages`);
+      const history: Message[] = (res.data || []).map((m: any) => ({
+        id: m.id || Math.random().toString(),
+        // API stores "human" / "assistant" — map to our internal "user" / "agent"
+        role: (m.role === 'human' || m.role === 'user') ? 'user' : 'agent',
+        content: m.content,
+        timestamp: m.created_at
+          ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '',
+        citations: m.citations || []
+      }));
+      setMessages(history.length > 0 ? history : [WELCOME_MSG]);
+    } catch {
+      setMessages([WELCOME_MSG]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  // When clicking a session in the sidebar
+  const handleSelectSession = (sid: string) => {
+    setSessionId(sid);
+    loadSessionMessages(sid);
+  };
+
+  // "+ New Chat" — create a fresh session immediately
+  const newChatMutation = useMutation({
+    mutationFn: () => api.post('/ai/sessions'),
+    onSuccess: (res) => {
+      const newId = res.data.id || res.data.session_id;
+      setSessionId(newId);
+      setMessages([WELCOME_MSG]);
+      queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
+    }
+  });
+
+  // Send message
+  const chatMutation = useMutation({
+    mutationFn: async (content: string) => {
+      let currentSessionId = sessionId;
+
+      // Auto-create session if none exists yet
+      if (!currentSessionId) {
+        const sessionRes = await api.post('/ai/sessions');
+        currentSessionId = sessionRes.data.id || sessionRes.data.session_id;
+        setSessionId(currentSessionId);
+        // Refresh sidebar immediately
+        queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
+      }
+
+      const res = await api.post('/ai/messages', {
+        session_id: currentSessionId,
+        role: 'user',
+        content
+      });
+      return res.data;
+    },
+    onSuccess: async (data) => {
+      const aiContent = data.content || "I have processed your request.";
+      
+      if (aiContent.includes("http://localhost:8000/auth/google/login")) {
+        try {
+          const authRes = await api.get('/auth/google/login');
+          window.location.href = authRes.data.auth_url;
+          return;
+        } catch (error) {
+          console.error("Failed to handle Google login redirect", error);
+        }
+      }
+
+      setMessages(prev => [...prev, {
+        id: data.id || Date.now().toString(),
+        role: 'agent',
+        content: aiContent,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        citations: data.citations || []
+      }]);
+      // Refresh sessions so title may update
+      queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
+    },
+    onError: () => {
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'agent',
+        content: "I'm having trouble connecting to my knowledge base right now. Please try again later.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    }
+  });
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    const userMsgContent = input;
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      role: 'user',
+      content: userMsgContent,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }]);
+    setInput('');
+    chatMutation.mutate(userMsgContent);
+  };
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  return (
+    <div className="flex flex-col lg:flex-row gap-4 md:gap-6 h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] relative">
+      {/* Mobile History Toggle */}
+      <div className="lg:hidden flex items-center justify-between px-2 mb-2">
+         <button 
+           onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+           className="flex items-center gap-2 px-4 py-2 bg-white/60 border border-white/40 rounded-xl text-xs font-bold uppercase tracking-widest text-primary shadow-sm"
+         >
+           <MessageSquare className="w-4 h-4" /> 
+           {isHistoryOpen ? 'Hide History' : 'Show History'}
+         </button>
+         
+         <button
+            onClick={() => newChatMutation.mutate()}
+            className="p-2 bg-primary text-white rounded-xl shadow-lg"
+            title="New Chat"
+         >
+            <Plus className="w-5 h-5" />
+         </button>
+      </div>
+
+      {/* Sessions Sidebar (Drawer on mobile, fixed on LG) */}
+      <AnimatePresence>
+        {(isHistoryOpen || window.innerWidth >= 1024) && (
+          <motion.div 
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            className={cn(
+              "glass-panel flex flex-col overflow-hidden z-[40] transition-all duration-300",
+              "fixed inset-y-0 left-0 w-72 m-4 lg:relative lg:inset-auto lg:w-64 lg:m-0 lg:flex shadow-2xl lg:shadow-xl",
+              !isHistoryOpen && "hidden lg:flex"
+            )}
+          >
+            <div className="p-5 border-b border-white/20 flex items-center justify-between bg-white/30">
+              <span className="font-black uppercase tracking-[0.15em] text-[10px] text-slate-500 italic">Chat Archive</span>
+              <button onClick={() => setIsHistoryOpen(false)} className="lg:hidden p-1.5 hover:bg-slate-100 rounded-lg">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-2 overflow-y-auto flex-1 space-y-1 custom-scrollbar">
+              {loadingSessions && (
+                <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary/60" /></div>
+              )}
+              {sessions?.map((s: any, idx: number) => (
+                <div
+                  key={s.id || idx}
+                  onClick={() => {
+                    handleSelectSession(s.id);
+                    if (window.innerWidth < 1024) setIsHistoryOpen(false);
+                  }}
+                  className={cn(
+                    "p-4 rounded-2xl cursor-pointer transition-all border group",
+                    sessionId === s.id
+                      ? 'bg-white shadow-md border-primary/20'
+                      : 'hover:bg-white/60 border-transparent hover:border-white/40'
+                  )}
+                >
+                  <h4 className={cn(
+                    "text-xs font-bold truncate leading-tight mb-1 uppercase tracking-tight",
+                    sessionId === s.id ? "text-primary" : "text-slate-700"
+                  )}>
+                    {s.title || `Untitled Session ${idx + 1}`}
+                  </h4>
+                  <div className="flex items-center justify-between">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">
+                        {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Active Now'}
+                     </p>
+                  </div>
+                </div>
+              ))}
+              {!loadingSessions && (!sessions || sessions.length === 0) && (
+                <div className="py-12 text-center">
+                  <Bot className="w-8 h-8 text-slate-200 mx-auto mb-2 opacity-50" />
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic px-4">No conversations found.</p>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-white/20 bg-white/20">
+              <button
+                onClick={() => newChatMutation.mutate()}
+                disabled={newChatMutation.isPending}
+                className="w-full py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:bg-slate-800 shadow-xl shadow-slate-900/10 flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {newChatMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                New Conversation
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Backdrop for mobile history */}
+      <AnimatePresence>
+        {isHistoryOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsHistoryOpen(false)}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[30] lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 glass-panel flex flex-col overflow-hidden relative border border-white/40 shadow-2xl">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <Bot className="w-96 h-96" />
+        </div>
+
+        <div className="h-16 border-b border-white/20 flex items-center px-4 md:px-6 bg-white/40 backdrop-blur z-10 justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-white shadow-lg">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-black text-sm uppercase tracking-widest text-slate-800 leading-none mb-1">Apex AI Assistant</h3>
+              <p className="text-[10px] text-emerald-600 font-black flex items-center gap-1 uppercase tracking-widest italic">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Network Active
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              setMessages([{ ...WELCOME_MSG, content: 'Neural context reset. Awaiting new instructions.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+            }}
+            className="px-4 py-2 bg-white/60 border border-white rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-primary transition-all shadow-sm"
+          >
+            Reset
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 z-10 scroll-smooth custom-scrollbar">
+          {loadingHistory ? (
+            <div className="flex-1 flex items-center justify-center py-24">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-3xl bg-primary/10 flex items-center justify-center animate-pulse">
+                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">Retrieving Logs...</p>
+              </div>
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                key={msg.id}
+                className={cn(
+                  "flex gap-3 md:gap-4 max-w-[95%] sm:max-w-[85%]",
+                  msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''
+                )}
+              >
+                <div className="shrink-0 mt-1">
+                  {msg.role === 'agent' ? (
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-2xl bg-gradient-to-tr from-primary to-[#7b42f6] flex items-center justify-center text-white shadow-xl">
+                      <Bot className="w-4 h-4 md:w-5 md:h-5" />
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 font-bold shadow-md border border-white">
+                      <User className="w-4 h-4 md:w-5 md:h-5" />
+                    </div>
+                  )}
+                </div>
+
+                <div className={cn(
+                  "flex flex-col gap-1.5",
+                  msg.role === 'user' ? 'items-end' : ''
+                )}>
+                  <div
+                    className={cn(
+                      "px-5 py-3.5 md:px-6 md:py-4 shadow-xl",
+                      msg.role === 'user'
+                        ? 'bg-primary text-white rounded-[2rem] rounded-tr-sm'
+                        : 'bg-white border border-white/60 rounded-[2rem] rounded-tl-sm text-slate-800'
+                    )}
+                  >
+                    <p className="text-sm md:text-base leading-relaxed font-medium whitespace-pre-wrap">{msg.content}</p>
+
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">Reference Sources:</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {msg.citations.map((c, i) => (
+                            <span key={i} className="text-[10px] font-bold bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-slate-600 flex items-center gap-2 hover:bg-slate-100 transition-colors">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {c}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {msg.timestamp && (
+                    <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest italic px-2">{msg.timestamp}</span>
+                  )}
+                </div>
+              </motion.div>
+            ))
+          )}
+
+          {chatMutation.isPending && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4 max-w-[85%]">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary to-[#7b42f6] flex items-center justify-center text-white shadow-xl">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div className="bg-white border border-white/60 px-6 py-4 rounded-[2rem] rounded-tl-sm shadow-xl flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce delay-100"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce delay-200"></span>
+              </div>
+            </motion.div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 md:p-6 bg-white/40 border-t border-white/20 backdrop-blur-xl z-20">
+          <div className="relative flex items-center max-w-4xl mx-auto w-full group">
+            <button className="absolute left-4 p-2 text-slate-400 hover:text-primary transition-colors bg-white/80 rounded-xl shadow-sm border border-white/40">
+              <Paperclip className="w-4 h-4" />
+            </button>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              disabled={chatMutation.isPending}
+              placeholder="Query HR knowledge base..."
+              className="w-full bg-white/80 border border-white shadow-2xl focus:border-primary/40 focus:ring-4 focus:ring-primary/5 transition-all rounded-[1.5rem] pl-16 pr-16 py-4 md:py-5 text-sm md:text-base font-bold outline-none disabled:opacity-50 placeholder:text-slate-300"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || chatMutation.isPending}
+              className="absolute right-3 p-3.5 bg-primary text-white rounded-2xl hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-50 transition-all shadow-xl shadow-primary/20"
+            >
+              <Send className="w-4 h-4 md:w-5 md:h-5 ml-0.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
