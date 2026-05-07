@@ -102,6 +102,24 @@ def apply_leave_tool(start_date: str, end_date: str, reason: str) -> str:
     user = current_user_var.get()
     db = SessionLocal()
     try:
+        locked_user = db.query(User).filter(User.id == user.id).with_for_update().first()
+
+        if not locked_user:
+            return f"User {user.full_name} not found."
+
+        approved_leaves = db.query(Leave).filter(Leave.user_id == locked_user.id, Leave.status == 'approved').all()
+        used_days = sum((l.end_date- l.start_date).days for l in approved_leaves) if approved_leaves else 0
+        pto_balance = 14 - used_days
+
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        requested_days = (end - start).days
+
+        if requested_days < pto_balance:
+            db.rollback()
+            return f"Failed: You requested {requested_days} days, but only have {pto_balance} PTO days left."
+
+
         leave_data = LeaveCreate(start_date=start_date, end_date=end_date, leave_type="pto", reason=reason)
         leave = leave_service.apply_leave(db, user_id=user.id, leave_in=leave_data)
         print("🔥 LEAVE SAVED:", leave.id)

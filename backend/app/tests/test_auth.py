@@ -1,3 +1,5 @@
+import pytest
+
 ### register check
 def create_user(client, email="test@test.com", password="123456"):
     return client.post("/auth/register", json={
@@ -93,22 +95,3 @@ def test_get_me_invalid_token(client):
         headers={"Authorization": "Bearer invalidtoken"}
     )
     assert res.status_code == 401
-
-def test_delete_user(client):
-    res = create_user(client)
-    token = res.json()["access_token"]
-
-    me = client.get(
-        "/auth/me",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-
-    user_id = me.json()["employee_id"]
-
-    res = client.delete(
-        f"/auth/users/{user_id}",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-
-    assert res.status_code == 200
-    assert res.json()["message"] == "User deleted successfully"

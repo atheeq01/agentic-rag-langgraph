@@ -2,6 +2,7 @@ fastapi
 uvicorn
 sqlalchemy
 pydantic
+pydantic[email]
 pydantic-settings
 python-multipart
 python-jose[cryptography]
@@ -22,3 +23,7 @@ pypdf
 pytest
 cryptography
 httpx
+slowapi
+langgraph-checkpoint-postgres
+psycopg[binary]
+psycopg-pool

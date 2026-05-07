@@ -16,8 +16,16 @@ BLOCKED_PATTERNS = [
     "disregard prior guidance"
 ]
 
-print("[Security] Generating embeddings for prompt injection shield...")
-BLOCKED_EMBEDDINGS = embeddings.embed_documents(BLOCKED_PATTERNS)
+BLOCKED_EMBEDDINGS = None
+
+
+def get_blocked_embeddings():
+    """Lazily load embeddings only when the first check is actually run."""
+    global BLOCKED_EMBEDDINGS
+    if BLOCKED_EMBEDDINGS is None:
+        print("[Security] Generating embeddings for prompt injection shield... (Lazy Load)")
+        BLOCKED_EMBEDDINGS = embeddings.embed_documents(BLOCKED_PATTERNS)
+    return BLOCKED_EMBEDDINGS
 
 
 def calculate_cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
@@ -48,9 +56,11 @@ def vector_based_check(text: str, threshold: float = 0.82) -> float:
         chunks = chunk_text(text)
         max_similarity = 0.0
 
+        blocked_embs = get_blocked_embeddings()
+
         for chunk in chunks:
             input_embedding = embeddings.embed_query(chunk)
-            for blocked_emb in BLOCKED_EMBEDDINGS:
+            for blocked_emb in blocked_embs:
                 similarity = calculate_cosine_similarity(input_embedding, blocked_emb)
                 if similarity > max_similarity:
                     max_similarity = similarity

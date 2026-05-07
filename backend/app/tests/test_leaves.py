@@ -135,3 +135,18 @@ def test_admin_can_approve_any_leave(client, db): # added db here
 
     assert res.status_code == 200
     assert res.json()["status"] == "approved"
+
+
+def test_employee_can_get_my_leaves(client, db):
+    emp_token = get_token_for(client, db, "emp_me@test.com", role="employee")
+
+    # Apply for a leave
+    apply_leave(client, emp_token)
+
+    res = client.get("/leaves/me", headers=auth_header(emp_token))
+
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    assert data[0]["reason"] == "Vacation"

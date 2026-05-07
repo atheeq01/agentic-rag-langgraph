@@ -7,25 +7,36 @@ import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'force_reset'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [tempToken, setTempToken] = useState('');
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
 
   const loginMutation = useMutation({
     mutationFn: async () => {
       const tokenRes = await api.post('/auth/login', { email, password });
+      if (tokenRes.data.needs_password_reset) {
+        return { needsReset: true, token: tokenRes.data.access_token };
+      }
       const token = tokenRes.data.access_token;
       const userRes = await api.get('/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return { token, user: userRes.data };
+      return { token, user: userRes.data, needsReset: false };
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
+      if (data.needsReset) {
+        setTempToken(data.token);
+        setMode('force_reset');
+        setPassword(''); // Clear it so they can type it in as "Current Password" if they want, or we could keep it. Let's keep it.
+        return;
+      }
       login(data.token, {
         employee_id: data.user.employee_id,
         email: data.user.email,
@@ -62,21 +73,65 @@ export default function AuthPage() {
     }
   });
 
+  const changePasswordMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/auth/change-password', 
+        { old_password: password, new_password: newPassword },
+        { headers: { Authorization: `Bearer ${tempToken}` } }
+      );
+      const userRes = await api.get('/auth/me', {
+        headers: { Authorization: `Bearer ${tempToken}` }
+      });
+      return { token: tempToken, user: userRes.data };
+    },
+    onSuccess: (data) => {
+      login(data.token, {
+        employee_id: data.user.employee_id,
+        email: data.user.email,
+        role: data.user.role,
+        name: data.user.full_name || data.user.email.split('@')[0]
+      });
+      navigate('/dashboard');
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.response?.data?.detail || 'Failed to update password. Please check your credentials.');
+    }
+  });
+
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 8) return "Password must be at least 8 characters.";
+    if (!/[A-Z]/.test(pwd)) return "Password must contain at least one uppercase letter.";
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) return "Password must contain at least one symbol.";
+    return null;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     if (mode === 'login') {
       loginMutation.mutate();
-    } else {
+    } else if (mode === 'register') {
       if (!fullName.trim()) {
         setErrorMsg('Full name is required.');
         return;
       }
+      const pwdError = validatePassword(password);
+      if (pwdError) {
+        setErrorMsg(pwdError);
+        return;
+      }
       registerMutation.mutate();
+    } else if (mode === 'force_reset') {
+      const pwdError = validatePassword(newPassword);
+      if (pwdError) {
+        setErrorMsg(pwdError);
+        return;
+      }
+      changePasswordMutation.mutate();
     }
   };
 
-  const isPending = loginMutation.isPending || registerMutation.isPending;
+  const isPending = loginMutation.isPending || registerMutation.isPending || changePasswordMutation.isPending;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative z-10 w-full h-full">
@@ -96,72 +151,126 @@ export default function AuthPage() {
           </div>
           
           {/* Mode Toggle */}
-          <div className="flex bg-white/40 border border-white/30 rounded-xl p-1 mb-8">
-            <button 
-              onClick={() => { setMode('login'); setErrorMsg(''); }}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${mode === 'login' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              <LogIn className="w-4 h-4" /> LOGIN
-            </button>
-            <button 
-              onClick={() => { setMode('register'); setErrorMsg(''); }}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${mode === 'register' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              <UserPlus className="w-4 h-4" /> REGISTER
-            </button>
-          </div>
+          {mode !== 'force_reset' && (
+            <div className="flex bg-white/40 border border-white/30 rounded-xl p-1 mb-8">
+              <button 
+                type="button"
+                onClick={() => { setMode('login'); setErrorMsg(''); }}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${mode === 'login' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <LogIn className="w-4 h-4" /> LOGIN
+              </button>
+              <button 
+                type="button"
+                onClick={() => { setMode('register'); setErrorMsg(''); }}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${mode === 'register' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <UserPlus className="w-4 h-4" /> REGISTER
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {mode === 'register' && (
+            {mode !== 'force_reset' ? (
+              <>
+                {mode === 'register' && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }} 
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-1.5"
+                  >
+                    <label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider block">Full Name</label>
+                    <input 
+                      type="text" 
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full bg-white/50 border border-white/40 focus:border-primary/50 focus:bg-white/80 transition-all rounded-xl px-4 py-3 text-sm outline-none placeholder:text-muted-foreground/60"
+                      placeholder="John Doe"
+                      required
+                    />
+                  </motion.div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider block">Email</label>
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-white/50 border border-white/40 focus:border-primary/50 focus:bg-white/80 transition-all rounded-xl px-4 py-3 text-sm outline-none placeholder:text-muted-foreground/60"
+                    placeholder="user@company.com"
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-1.5 relative">
+                  <label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider block">Password</label>
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-white/50 border border-white/40 focus:border-primary/50 focus:bg-white/80 transition-all rounded-xl px-4 py-3 text-sm outline-none pr-10"
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
               <motion.div 
                 initial={{ opacity: 0, height: 0 }} 
                 animate={{ opacity: 1, height: 'auto' }}
-                className="space-y-1.5"
+                className="space-y-4"
               >
-                <label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider block">Full Name</label>
-                <input 
-                  type="text" 
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-white/50 border border-white/40 focus:border-primary/50 focus:bg-white/80 transition-all rounded-xl px-4 py-3 text-sm outline-none placeholder:text-muted-foreground/60"
-                  placeholder="John Doe"
-                  required
-                />
+                <div className="text-center mb-6">
+                  <h3 className="text-lg font-bold text-slate-900">Update Password Required</h3>
+                  <p className="text-sm text-slate-500 mt-1">Your password has expired. Please update it to continue.</p>
+                </div>
+                
+                <div className="space-y-1.5 relative">
+                  <label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider block">Current Password</label>
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-white/50 border border-white/40 focus:border-primary/50 focus:bg-white/80 transition-all rounded-xl px-4 py-3 text-sm outline-none pr-10"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 relative">
+                  <label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider block">New Password</label>
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-white/50 border border-white/40 focus:border-primary/50 focus:bg-white/80 transition-all rounded-xl px-4 py-3 text-sm outline-none pr-10"
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             )}
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider block">Email</label>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/50 border border-white/40 focus:border-primary/50 focus:bg-white/80 transition-all rounded-xl px-4 py-3 text-sm outline-none placeholder:text-muted-foreground/60"
-                placeholder="user@company.com"
-                required
-              />
-            </div>
-            
-            <div className="space-y-1.5 relative">
-              <label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider block">Password</label>
-              <div className="relative">
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white/50 border border-white/40 focus:border-primary/50 focus:bg-white/80 transition-all rounded-xl px-4 py-3 text-sm outline-none pr-10"
-                  placeholder="••••••••"
-                  required
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
 
             {errorMsg && (
               <motion.div 
@@ -180,8 +289,8 @@ export default function AuthPage() {
             >
               {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
               {isPending 
-                ? (mode === 'login' ? 'AUTHENTICATING...' : 'CREATING ACCOUNT...') 
-                : (mode === 'login' ? 'LOGIN' : 'CREATE ACCOUNT')
+                ? (mode === 'login' ? 'AUTHENTICATING...' : mode === 'register' ? 'CREATING ACCOUNT...' : 'UPDATING...') 
+                : (mode === 'login' ? 'LOGIN' : mode === 'register' ? 'CREATE ACCOUNT' : 'UPDATE PASSWORD')
               }
             </button>
           </form>

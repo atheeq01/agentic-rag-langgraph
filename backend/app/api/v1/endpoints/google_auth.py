@@ -1,5 +1,8 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
+from uuid import UUID
 from sqlalchemy.orm import Session
 import httpx
 from urllib.parse import urlencode
@@ -15,8 +18,6 @@ router = APIRouter(prefix="/auth/google", tags=["Google OAuth"])
 
 SCOPES = "https://www.googleapis.com/auth/gmail.send"
 
-FRONTEND_CHAT_URL = "http://localhost:5173"
-
 
 @router.get("/login")
 def google_login(current_user: User = Depends(get_current_user)):
@@ -29,7 +30,7 @@ def google_login(current_user: User = Depends(get_current_user)):
         "response_type": "code",
         "scope": SCOPES,
         "access_type": "offline",
-        "prompt": "consent",
+        "prompt": "select_account consent",
         "state": state
     }
 
@@ -41,7 +42,10 @@ def google_login(current_user: User = Depends(get_current_user)):
 @router.get("/callback")
 async def google_callback(code: str, state: str, db: Session = Depends(get_db)):
     """Receives the code from Google, saves tokens, and REDIRECTS back to React."""
-    user_id = state
+    try:
+        user_id = UUID(state)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid state format")
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:

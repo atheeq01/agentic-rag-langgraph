@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.endpoints import auth, leaves, ai_chat, complaints, documents, google_auth, users
@@ -7,26 +8,32 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-
 limiter = Limiter(key_func=get_remote_address)
 
 Base.metadata.create_all(bind=engine)
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
 
 app = FastAPI(title="HR AI System Backend")
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+
+origins = ["https://apex-hr-ca928.web.app"]
+frontend_url = os.environ.get("FRONTEND_URL")
+
+if frontend_url:
+    origins.append(frontend_url)
+else:
+    print("WARNING: FRONTEND_URL environment variable is not set!")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]  )
+    allow_headers=["*"]
+)
+
 # Include routers
 app.include_router(auth.router)
 app.include_router(leaves.router)

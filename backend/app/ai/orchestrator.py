@@ -5,7 +5,9 @@ import time
 from dotenv import load_dotenv
 
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
+from psycopg_pool import ConnectionPool
 from langgraph.graph.message import add_messages
 
 from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage, ToolMessage
@@ -13,6 +15,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.ai.prompts import LEAVE_PROMPT, COMPLAINT_PROMPT, HR_PROMPT, COMMON_AGENT_PROMPT
 from app.ai.router.hybrid_router import semantic_router
+from app.core.config import settings
 
 from app.ai.tools.hr_tools import (
     check_sql_leave_balance,
@@ -27,15 +30,29 @@ from app.ai.tools.hr_tools import (
 load_dotenv()
 
 API_KEY = os.getenv("GOOGLE_API_KEY")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL")
 if not API_KEY:
     raise ValueError("GOOGLE_API_KEY not found")
 
-# Use the fastest available model (no thinking overhead)
 llm = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite-preview",
+    model=DEFAULT_MODEL,
     temperature=0.2,
     timeout=30,
 )
+
+connection_kwargs = {
+    "autocommit": True,
+    "prepare_threshold": 0,
+}
+
+pool = AsyncConnectionPool(
+    conninfo=settings.DATABASE_URL,
+    kwargs=connection_kwargs,
+    max_size=20,
+    open=False
+)
+
+check_pointer = AsyncPostgresSaver(pool)
 
 
 # ──────────────── STATE ────────────────
@@ -103,7 +120,7 @@ def execute_tools(response, tool_map):
 
 
 # ──────────────── AGENT RUNNER (handles tool loop internally) ────────────────
-def _run_agent_loop(state: State, bound_llm, base_prompt: str, tool_map: dict, max_iterations: int = 6):
+async def _run_agent_loop(state: State, bound_llm, base_prompt: str, tool_map: dict, max_iterations: int = 6):
     """
     Runs a single agent with an internal tool-calling loop.
     Instead of bouncing back through the graph for each tool call (slow),
@@ -116,7 +133,7 @@ def _run_agent_loop(state: State, bound_llm, base_prompt: str, tool_map: dict, m
 
     for i in range(max_iterations):
         t0 = time.time()
-        response = bound_llm.invoke(messages)
+        response = await bound_llm.ainvoke(messages)
         elapsed = time.time() - t0
         print(f"  [Agent] LLM call #{i + 1} took {elapsed:.2f}s")
 
@@ -138,9 +155,9 @@ def _run_agent_loop(state: State, bound_llm, base_prompt: str, tool_map: dict, m
 
 # ──────────────── AGENT NODES ────────────────
 
-def run_common_agent(state: State):
+async def run_common_agent(state: State):
     print("[Common Agent] Handling general utility task...")
-    return _run_agent_loop(
+    return await _run_agent_loop(
         state, common_llm, COMMON_AGENT_PROMPT,
         tool_map={
             "check_sql_leave_balance": check_sql_leave_balance,
@@ -150,9 +167,9 @@ def run_common_agent(state: State):
     )
 
 # ──────────────── AGENT NODES ────────────────
-def run_leave_agent(state: State):
+async def run_leave_agent(state: State):
     print("[Leave Agent] Starting...")
-    return _run_agent_loop(
+    return await _run_agent_loop(
         state, leave_llm, LEAVE_PROMPT,
         tool_map={
             "check_sql_leave_balance": check_sql_leave_balance,
@@ -163,9 +180,9 @@ def run_leave_agent(state: State):
     )
 
 
-def run_complaint_agent(state: State):
+async def run_complaint_agent(state: State):
     print("[Complaint Agent] Starting...")
-    return _run_agent_loop(
+    return await _run_agent_loop(
         state, complaint_llm, COMPLAINT_PROMPT,
         tool_map={
             "submit_formal_complaint": submit_formal_complaint,
@@ -174,9 +191,9 @@ def run_complaint_agent(state: State):
     )
 
 
-def run_hr_agent(state: State):
+async def run_hr_agent(state: State):
     print("[HR Agent] Starting...")
-    return _run_agent_loop(
+    return await _run_agent_loop(
         state, hr_llm, HR_PROMPT,
         tool_map={
             "hr_vector_search": hr_vector_search,
@@ -201,19 +218,27 @@ builder.add_edge("leave_agent", END)
 builder.add_edge("complaint_agent", END)
 builder.add_edge("hr_agent", END)
 
-graph = builder.compile(checkpointer=MemorySaver())
+graph = builder.compile(checkpointer=check_pointer)
 
 
 # ──────────────── RUN CHAT ────────────────
-def run_chat(user_input: str, user, session_id: str):
+_db_setup_completed = False
+async def run_chat(user_input: str, user, session_id: str):
     """Execute the agentic RAG graph for a user message."""
+    global _db_setup_completed
+
+    if not _db_setup_completed:
+        await pool.open()
+        await check_pointer.setup()
+        _db_setup_completed = True
+
     current_user_var.set(user)
 
     config = {"configurable": {"thread_id": str(session_id)}}
 
     t_start = time.time()
 
-    result = graph.invoke(
+    result = await graph.ainvoke(
         {
             "messages": [HumanMessage(content=user_input)],
             "user_context": {

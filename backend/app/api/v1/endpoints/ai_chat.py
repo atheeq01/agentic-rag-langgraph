@@ -57,7 +57,7 @@ def is_malicious_prompt(user_input: str) -> bool:
 
 # Send a message
 @router.post("/messages", response_model=ChatMessageOut)
-def send_message(
+async def send_message(
         message_in: ChatMessageCreate,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)):
@@ -71,13 +71,14 @@ def send_message(
             detail="Request blocked due to security policy violations."
         )
 
+
     stmt = select(ChatSession).where(
         ChatSession.id == message_in.session_id,
         ChatSession.user_id == current_user.id)
     if not db.scalar(stmt):
         raise HTTPException(status_code=404, detail="Session not found")
     chat_service.add_message(db, message_in)
-    ai_response_text = run_chat(
+    ai_response_text = await run_chat(
         user_input=message_in.content,
         user=current_user,
         session_id=message_in.session_id

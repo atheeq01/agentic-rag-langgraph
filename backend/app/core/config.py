@@ -8,13 +8,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    AI_DEFAULT_MODEL: str
     GOOGLE_API_KEY: str
-
-
+    DEFAULT_MODEL: str
+    FRONTEND_URL: str
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/google/callback"
+    GOOGLE_REDIRECT_URI: str
 
     ENCRYPTION_KEY: str
 

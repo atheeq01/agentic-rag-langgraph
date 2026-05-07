@@ -1,6 +1,10 @@
+import re
+
 import bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+from fastapi import HTTPException, status
 from jose import jwt, JWTError
 from cryptography.fernet import Fernet, InvalidToken
 from app.core.config import settings
@@ -50,3 +54,22 @@ def decrypt_token(encrypted_token: str) -> str:
         return decrypted_bytes.decode('utf-8')
     except InvalidToken:
         raise ValueError("Decryption failed. The encryption key may have changed.")
+
+def validate_password_complexity(password: str):
+    """Validates if the password meets security requirements."""
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long."
+        )
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one uppercase letter."
+        )
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one symbol."
+        )
+    return True

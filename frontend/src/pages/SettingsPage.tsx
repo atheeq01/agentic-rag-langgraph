@@ -13,7 +13,8 @@ import {
   UserCog,
   Trash2,
   X,
-  ChevronDown
+  ChevronDown,
+  Unlock
 } from 'lucide-react';
 import { useAuthStore, hasRole } from '@/store/useStore';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -315,7 +316,7 @@ function SecurityTab() {
 
   const mutation = useMutation({
     mutationFn: (data: { old_password: string; new_password: string }) =>
-      api.patch('/users/me/password', data),
+      api.post('/auth/change-password', data),
     onSuccess: () => {
       setStatus({ type: 'success', message: 'Password updated successfully!' });
       setPasswordData({ old_password: '', new_password: '', confirm_password: '' });
@@ -329,10 +330,22 @@ function SecurityTab() {
     }
   });
 
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 8) return "Password must be at least 8 characters.";
+    if (!/[A-Z]/.test(pwd)) return "Password must contain at least one uppercase letter.";
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) return "Password must contain at least one symbol.";
+    return null;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordData.new_password !== passwordData.confirm_password) {
       setStatus({ type: 'error', message: 'New passwords do not match.' });
+      return;
+    }
+    const pwdError = validatePassword(passwordData.new_password);
+    if (pwdError) {
+      setStatus({ type: 'error', message: pwdError });
       return;
     }
     mutation.mutate({
@@ -423,6 +436,7 @@ function TeamTab({ isAdmin }: { isAdmin: boolean }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeRoleMenu, setActiveRoleMenu] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<any>(null);
+  const [teamStatus, setTeamStatus] = useState<{type: 'success'|'error', message: string} | null>(null);
   const queryClient = useQueryClient();
 
   const { data: users, isLoading } = useQuery({
@@ -449,6 +463,19 @@ function TeamTab({ isAdmin }: { isAdmin: boolean }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] })
   });
 
+  const unlockMutation = useMutation({
+    mutationFn: (userId: string) => api.post(`/auth/users/${userId}/unlock`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setTeamStatus({ type: 'success', message: 'Account successfully unlocked.' });
+      setTimeout(() => setTeamStatus(null), 3000);
+    },
+    onError: (error: any) => {
+      setTeamStatus({ type: 'error', message: error.response?.data?.detail || 'Failed to unlock account.' });
+      setTimeout(() => setTeamStatus(null), 3000);
+    }
+  });
+
   return (
     <div className="space-y-6">
       <AddUserModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
@@ -473,6 +500,13 @@ function TeamTab({ isAdmin }: { isAdmin: boolean }) {
             </button>
           )}
         </div>
+
+        {teamStatus && (
+          <div className={cn("px-6 py-3 border-b text-[10px] font-black uppercase tracking-widest flex items-center gap-2", teamStatus.type === 'success' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100")}>
+            {teamStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+            {teamStatus.message}
+          </div>
+        )}
 
         <div className="w-full overflow-x-auto custom-scrollbar">
           <table className="w-full min-w-[700px]">
@@ -529,6 +563,14 @@ function TeamTab({ isAdmin }: { isAdmin: boolean }) {
                               </div>
                             )}
                           </div>
+                          <button 
+                            onClick={() => unlockMutation.mutate(u.id)}
+                            disabled={unlockMutation.isPending}
+                            title="Unlock Account"
+                            className="p-2 rounded-xl border hover:bg-emerald-50 border-transparent hover:border-emerald-100 text-emerald-600 transition-all"
+                          >
+                            {unlockMutation.isPending && unlockMutation.variables === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
+                          </button>
                           <button 
                             onClick={() => setUserToDelete(u)} 
                             disabled={deleteUserMutation.isPending || u.role === 'admin' || u.role === 'hr'} 

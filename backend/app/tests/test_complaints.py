@@ -1,5 +1,6 @@
 import pytest
 from uuid import UUID
+from sqlalchemy import select
 
 from app.models.user import User
 
@@ -114,3 +115,29 @@ def test_anonymous_complaints_forbidden(client):
     )
 
     assert res.status_code in [403, 401]
+
+
+def test_hr_can_get_all_complaints(client, db):
+    # Setup user with HR role manually
+    create_user(client, "hr@test.com")
+    hr_user = db.scalar(select(User).where(User.email == "hr@test.com"))
+    hr_user.role = "hr"
+    db.commit()
+
+    token = client.post("/auth/login", json={"email": "hr@test.com", "password": "123456"}).json()["access_token"]
+
+    res = client.get("/complaints/", headers=auth_header(token))
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)
+
+
+def test_hr_can_get_anonymous_complaints(client, db):
+    create_user(client, "hr2@test.com")
+    hr_user = db.scalar(select(User).where(User.email == "hr2@test.com"))
+    hr_user.role = "hr"
+    db.commit()
+
+    token = client.post("/auth/login", json={"email": "hr2@test.com", "password": "123456"}).json()["access_token"]
+
+    res = client.get("/complaints/anonymous", headers=auth_header(token))
+    assert res.status_code == 200
