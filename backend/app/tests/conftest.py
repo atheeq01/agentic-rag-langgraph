@@ -24,6 +24,7 @@ app.db.session.engine = test_engine
 import langgraph.checkpoint.postgres.aio
 from langgraph.checkpoint.memory import MemorySaver
 import psycopg_pool
+import pinecone
 
 class MockAsyncPostgresSaver(MemorySaver):
     async def setup(self):
@@ -35,8 +36,32 @@ class MockPool:
     def __init__(self, *args, **kwargs):
         pass
 
+class MockPinecone:
+    def __init__(self, *args, **kwargs):
+        pass
+    def list_indexes(self):
+        class MockList:
+            def names(self):
+                return ["enterprise-hr-index-v2"]
+        return MockList()
+    def describe_index(self, *args, **kwargs):
+        class MockInfo:
+            host = "dummy-host"
+        return MockInfo()
+    def Index(self, *args, **kwargs):
+        class MockConfig:
+            host = "dummy-host"
+            api_key = "dummy-api-key"
+        class MockIndex:
+            config = MockConfig()
+            def __init__(self, *args, **kwargs): pass
+            def describe_index_stats(self):
+                return {"dimension": 3072}
+        return MockIndex()
+
 langgraph.checkpoint.postgres.aio.AsyncPostgresSaver = lambda pool: MockAsyncPostgresSaver()
 psycopg_pool.AsyncConnectionPool = MockPool
+pinecone.Pinecone = MockPinecone
 
 # 4. NOW IT IS SAFE TO IMPORT YOUR APP
 from app.main import app
