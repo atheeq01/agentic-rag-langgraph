@@ -115,7 +115,7 @@ def apply_leave_tool(start_date: str, end_date: str, reason: str) -> str:
         end = datetime.strptime(end_date, "%Y-%m-%d")
         requested_days = (end - start).days
 
-        if requested_days < pto_balance:
+        if requested_days > pto_balance:
             db.rollback()
             return f"Failed: You requested {requested_days} days, but only have {pto_balance} PTO days left."
 
@@ -137,8 +137,8 @@ def draft_and_send_email(recipient: str, subject: str, body: str, is_confirmed: 
 
     if not user.google_refresh_token:
         return (
-            "AUTHORIZATION REQUIRED: You cannot proceed because your Google account is not connected. "
-            "Tell the user: 'You need to connect your Gmail to send requests. Please click [Connect Google](http://localhost:8000/auth/google/login) to authorize the app, then let me know when you are done.'"
+            "GOOGLE_AUTH_REQUIRED "
+            "Tell the user: 'You need to connect your Gmail to send requests. I will prompt you to connect your account now.'"
         )
 
     if not is_confirmed:
@@ -175,8 +175,9 @@ def submit_formal_complaint(title: str, description: str, accused_person: str, i
 
     if not is_anonymous and not user.google_refresh_token:
         return (
-            "AUTHORIZATION REQUIRED: Tell the user they must connect their Google account to submit a non-anonymous complaint. "
-            "Provide this link: [Connect Google](http://localhost:8000/auth/google/login)"
+            "GOOGLE_AUTH_REQUIRED "
+            "Tell the user they must connect their Google account to submit a non-anonymous complaint. "
+            "I will prompt you to connect your account now."
         )
 
     try:

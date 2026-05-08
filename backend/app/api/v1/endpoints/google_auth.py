@@ -30,7 +30,8 @@ def google_login(current_user: User = Depends(get_current_user)):
         "response_type": "code",
         "scope": SCOPES,
         "access_type": "offline",
-        "prompt": "select_account consent",
+        "prompt": "select_account",
+        "include_granted_scopes": "true",
         "state": state
     }
 
@@ -96,6 +97,10 @@ async def google_callback(code: str, state: str, db: Session = Depends(get_db)):
             <p>This window will close automatically. You can return to your chat.</p>
         </div>
         <script>
+            // Notify parent window of success
+            if (window.opener) {
+                window.opener.postMessage({ type: "GOOGLE_AUTH_SUCCESS" }, "*");
+            }
             // Attempt to auto-close the tab after 2.5 seconds
             setTimeout(() => {
                 window.close();

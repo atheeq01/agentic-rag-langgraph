@@ -18,8 +18,8 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-origins = ["https://apex-hr-ca928.web.app"]
-frontend_url = os.environ.get("FRONTEND_URL")
+origins = []
+frontend_url = os.getenv("FRONTEND_URL")
 
 if frontend_url:
     origins.append(frontend_url)

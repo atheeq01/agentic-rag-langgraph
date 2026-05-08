@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, User, Send, Paperclip, CheckCircle2, Loader2, Plus, MessageSquare, X } from 'lucide-react';
+import { Bot, User, Send, Paperclip, CheckCircle2, Loader2, Plus, MessageSquare, X, ExternalLink } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-type Message = { id: string; role: 'user' | 'agent'; content: string; timestamp: string; citations?: string[] };
+type Message = { id: string; role: 'user' | 'agent'; content: string; timestamp: string; citations?: string[]; authUrl?: string };
 
 const WELCOME_MSG: Message = {
   id: 'welcome',
@@ -19,7 +19,9 @@ export default function AIChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([WELCOME_MSG]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [pendingAuthUrl, setPendingAuthUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastUserMessageRef = useRef<string>("");
   const queryClient = useQueryClient();
 
   const scrollToBottom = () => {
@@ -100,10 +102,48 @@ export default function AIChatPage() {
     onSuccess: async (data) => {
       const aiContent = data.content || "I have processed your request.";
       
-      if (aiContent.includes("http://localhost:8000/auth/google/login")) {
+      if (aiContent.includes("GOOGLE_AUTH_REQUIRED")) {
         try {
           const authRes = await api.get('/auth/google/login');
-          window.location.href = authRes.data.auth_url;
+          const authUrl = authRes.data.auth_url;
+          setPendingAuthUrl(authUrl);
+
+          // Attempt to open popup
+          const popup = window.open(authUrl, "google-auth", "width=500,height=600");
+          const popupBlocked = !popup || popup.closed || typeof popup.closed === 'undefined';
+
+          const handleMessage = (event: MessageEvent) => {
+            if (event.data?.type === "GOOGLE_AUTH_SUCCESS") {
+                window.removeEventListener("message", handleMessage);
+                popup?.close();
+                setPendingAuthUrl(null);
+                if (lastUserMessageRef.current) {
+                    chatMutation.mutate(lastUserMessageRef.current);
+                }
+            }
+          };
+
+          window.addEventListener("message", handleMessage);
+
+          const pollClosed = setInterval(() => {
+            if (popup?.closed) {
+                clearInterval(pollClosed);
+                window.removeEventListener("message", handleMessage);
+            }
+          }, 500);
+
+          const msgContent = popupBlocked
+            ? "To book your leave, I need access to your Google account. Your browser blocked the popup — please click the button below to connect your Google account."
+            : "I have opened a secure popup for you to connect your Google account. Please complete the authorization there, and I will automatically retry your request!";
+
+          setMessages(prev => [...prev, {
+            id: data.id || Date.now().toString(),
+            role: 'agent',
+            content: msgContent,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            citations: data.citations || [],
+            authUrl
+          }]);
           return;
         } catch (error) {
           console.error("Failed to handle Google login redirect", error);
@@ -133,6 +173,7 @@ export default function AIChatPage() {
   const handleSend = () => {
     if (!input.trim()) return;
     const userMsgContent = input;
+    lastUserMessageRef.current = userMsgContent;
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
       role: 'user',
@@ -325,6 +366,47 @@ export default function AIChatPage() {
                     )}
                   >
                     <p className="text-sm md:text-base leading-relaxed font-medium whitespace-pre-wrap">{msg.content}</p>
+
+                    {/* Google Auth Connect Button */}
+                    {msg.authUrl && (
+                      <div className="mt-4 pt-4 border-t border-slate-100">
+                        <a
+                          href={msg.authUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            // Also try opening as popup on click
+                            const popup = window.open(msg.authUrl, "google-auth", "width=500,height=600");
+                            if (popup) {
+                              const handleMessage = (event: MessageEvent) => {
+                                if (event.data?.type === "GOOGLE_AUTH_SUCCESS") {
+                                  window.removeEventListener("message", handleMessage);
+                                  popup.close();
+                                  setPendingAuthUrl(null);
+                                  if (lastUserMessageRef.current) {
+                                    chatMutation.mutate(lastUserMessageRef.current);
+                                  }
+                                }
+                              };
+                              window.addEventListener("message", handleMessage);
+                              // prevent default navigation since we opened popup
+                              return false;
+                            }
+                          }}
+                          className="inline-flex items-center gap-2.5 mt-1 px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/>
+                          </svg>
+                          Connect with Google
+                          <ExternalLink className="w-3 h-3 opacity-70" />
+                        </a>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-2 italic">Click above to connect your Google account, then your request will be retried automatically.</p>
+                      </div>
+                    )}
 
                     {msg.citations && msg.citations.length > 0 && (
                       <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
