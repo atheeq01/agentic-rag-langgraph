@@ -5,7 +5,7 @@ from app.models.user import User
 
 # --- Helper Functions ---
 
-def create_user(client, email, password="password123", full_name="Test User"):
+def create_user(client, email, password="TestPass@123", full_name="Test User"):
     return client.post("/auth/register", json={
         "email": email,
         "password": password,
@@ -13,7 +13,7 @@ def create_user(client, email, password="password123", full_name="Test User"):
     })
 
 
-def login(client, email, password="password123"):
+def login(client, email, password="TestPass@123"):
     return client.post("/auth/login", json={
         "email": email,
         "password": password
@@ -76,13 +76,13 @@ def test_change_password(client, db):
     token = get_token_for(client, db, "passuser@test.com")
 
     res = client.patch("/users/me/password", json={
-        "old_password": "password123",
-        "new_password": "newpassword456"
+        "old_password": "TestPass@123",
+        "new_password": "NewPass@456!"
     }, headers=auth_header(token))
 
     assert res.status_code == 200
 
-    res_login = login(client, "passuser@test.com", "newpassword456")
+    res_login = login(client, "passuser@test.com", "NewPass@456!")
     assert res_login.status_code == 200
 
 

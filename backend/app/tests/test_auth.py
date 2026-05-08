@@ -1,7 +1,7 @@
 import pytest
 
 ### register check
-def create_user(client, email="test@test.com", password="123456"):
+def create_user(client, email="test@test.com", password="TestPass@123"):
     return client.post("/auth/register", json={
         "email": email,
         "password": password,
@@ -33,7 +33,7 @@ def test_login_json_success(client):
     create_user(client)
     res = client.post("/auth/login", json={
         "email":"test@test.com",
-        "password":"123456"
+        "password":"TestPass@123"
     })
     assert res.status_code == 200
     data = res.json()
@@ -43,7 +43,7 @@ def test_login_json_success(client):
 def test_login_json_invalid(client):
     res = client.post("/auth/login", json={
         "email":"fake_user@test.com",
-        "password":"123456"
+        "password":"TestPass@123"
     })
     assert res.status_code == 401
     assert res.json()["detail"] == "Invalid credentials"
@@ -52,7 +52,7 @@ def test_login_form_success(client):
     create_user(client)
     res = client.post("/auth/login-form", data={
         "username":"test@test.com",
-        "password":"123456"
+        "password":"TestPass@123"
     })
     assert res.status_code == 200
     data = res.json()
@@ -63,7 +63,7 @@ def test_login_form_invalid(client):
     create_user(client)
     res = client.post("/auth/login-form", data={
         "username":"test@test.com",
-        "password":"sdasfsdg"
+        "password":"WrongPass@999"
     })
     assert res.status_code == 401
 

@@ -4,12 +4,12 @@ from app.models.user import User
 
 
 def get_token_for(client, db, email, role="employee"):
-    client.post("/auth/register", json={"email": email, "password": "123", "full_name": "Test"})
+    client.post("/auth/register", json={"email": email, "password": "TestPass@123", "full_name": "Test"})
     user = db.scalar(select(User).where(User.email == email))
     if user:
         user.role = role
         db.commit()
-    return client.post("/auth/login", json={"email": email, "password": "123"}).json()["access_token"]
+    return client.post("/auth/login", json={"email": email, "password": "TestPass@123"}).json()["access_token"]
 
 
 def auth_header(token):

@@ -4,7 +4,7 @@ from uuid import UUID
 def create_user(client, email):
     return client.post("/auth/register", json={
         "email": email,
-        "password": "123456",
+        "password": "TestPass@123",
         "full_name": "Test User",
     })
 
@@ -12,7 +12,7 @@ def create_user(client, email):
 def login(client, email):
     return client.post("/auth/login", json={
         "email": email,
-        "password": "123456"
+        "password": "TestPass@123"
     })
 
 

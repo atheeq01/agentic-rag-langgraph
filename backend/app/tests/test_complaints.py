@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.models.user import User
 
-def create_user(client, email="test@test.com", password="123456"):
+def create_user(client, email="test@test.com", password="TestPass@123"):
     return client.post("/auth/register", json={
         "email": email,
         "password": password,
@@ -124,7 +124,7 @@ def test_hr_can_get_all_complaints(client, db):
     hr_user.role = "hr"
     db.commit()
 
-    token = client.post("/auth/login", json={"email": "hr@test.com", "password": "123456"}).json()["access_token"]
+    token = client.post("/auth/login", json={"email": "hr@test.com", "password": "TestPass@123"}).json()["access_token"]
 
     res = client.get("/complaints/", headers=auth_header(token))
     assert res.status_code == 200
@@ -137,7 +137,7 @@ def test_hr_can_get_anonymous_complaints(client, db):
     hr_user.role = "hr"
     db.commit()
 
-    token = client.post("/auth/login", json={"email": "hr2@test.com", "password": "123456"}).json()["access_token"]
+    token = client.post("/auth/login", json={"email": "hr2@test.com", "password": "TestPass@123"}).json()["access_token"]
 
     res = client.get("/complaints/anonymous", headers=auth_header(token))
     assert res.status_code == 200
