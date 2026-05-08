@@ -1,0 +1,57 @@
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Git and version control
+.git/
+.gitignore
+
+# Environment variables and secrets
+.env.*
+!.env.example
+
+# Editor and IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Docker and test files
+Dockerfile
+.dockerignore
+.pytest_cache/
+htmlcov/
+.coverage
+
+credentials.json
+tests/

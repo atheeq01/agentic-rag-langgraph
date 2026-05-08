@@ -1,0 +1,15 @@
+.gcloudignore
+.git
+.gitignore
+__pycache__/
+venv/
+env/
+.env
+.pytest_cache/
+.dockerignore
+Dockerfile
+*.pyc
+*.pyo
+*.pyd
+.db
+db.sqlite3
