@@ -1,0 +1,55 @@
+# ── Python ──────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+*.so
+
+# ── Environment / Secrets (NEVER commit these) ──
+.env
+.env.*
+!.env.example
+backend/.env
+backend/credentials.json
+
+# ── Pytest ──────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# ── Node / Frontend ─────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+node_modules/
+
+# ── Firebase ────────────────────────────────
+.firebase/
+frontend/.firebase/
+
+# ── IDE ─────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── OS ──────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Misc ────────────────────────────────────
+*.zip
+*.log
+data/
