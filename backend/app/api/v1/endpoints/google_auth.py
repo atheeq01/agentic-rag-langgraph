@@ -30,13 +30,12 @@ def google_login(current_user: User = Depends(get_current_user)):
         "response_type": "code",
         "scope": SCOPES,
         "access_type": "offline",
-        "prompt": "select_account",
+        "prompt": "select_account consent",
         "include_granted_scopes": "true",
         "state": state
     }
 
-    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
-
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}&authuser=-1"
     return {"auth_url": auth_url}
 
 
