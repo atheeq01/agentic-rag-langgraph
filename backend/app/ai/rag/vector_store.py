@@ -1,17 +1,15 @@
 import os
-from dotenv import load_dotenv
 from pinecone import Pinecone, ServerlessSpec
 from langchain_pinecone import PineconeVectorStore
 from app.ai.rag.embeddings import embeddings
-
-load_dotenv()
+from app.core.config import settings
 
 _vector_store = None
 _index = None
 
 def _init_pinecone():
     global _vector_store, _index
-    raw_api_key = os.getenv("PINECONE_API_KEY")
+    raw_api_key = settings.pinecone_api_key
     if not raw_api_key:
         raise ValueError("PINECONE_API_KEY is missing from your environment!")
 

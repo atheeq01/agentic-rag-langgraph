@@ -13,7 +13,14 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.models.document import Document
 from app.ai.rag.vector_store import get_vector_store, get_index
 
-storage_client = storage.Client()
+_storage_client = None
+
+def get_storage_client():
+    global _storage_client
+    if _storage_client is None:
+        _storage_client = storage.Client()
+    return _storage_client
+
 BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "my-enterprise-hr-docs")
 
 def upload_and_process_document(db: Session, file: UploadFile, user_id: uuid.UUID):
@@ -26,12 +33,12 @@ def upload_and_process_document(db: Session, file: UploadFile, user_id: uuid.UUI
     temp_pdf.close()
 
     try:
-        bucket = storage_client.bucket(BUCKET_NAME)
+        bucket = get_storage_client().bucket(BUCKET_NAME)
 
         if not bucket.exists():
             print(f"Bucket '{BUCKET_NAME}' not found! Auto-creating multi-region bucket...")
             try:
-                bucket = storage_client.create_bucket(bucket, location="ASIA")
+                bucket = get_storage_client().create_bucket(bucket, location="ASIA")
                 print(f"Successfully created multi-region bucket: {BUCKET_NAME}")
             except Conflict:
                 raise Exception(f"Bucket name '{BUCKET_NAME}' is already taken globally. Please change GCS_BUCKET_NAME in your .env file to something unique.")
@@ -74,7 +81,7 @@ def get_document_view_url(db: Session, doc_id: uuid.UUID):
     if not doc:
         return None
 
-    bucket = storage_client.bucket(BUCKET_NAME)
+    bucket = get_storage_client().bucket(BUCKET_NAME)
     blob = bucket.blob(f"hr_policies/{doc.id}/{doc.filename}")
     return blob.generate_signed_url(version="v4", expiration=900, method="GET")
 
@@ -91,7 +98,7 @@ def delete_document(db: Session, doc_id: uuid.UUID):
         print(f"Warning: Pinecone Delete failed: {e}")
 
     try:
-        bucket = storage_client.bucket(BUCKET_NAME)
+        bucket = get_storage_client().bucket(BUCKET_NAME)
         if bucket.exists():
             blob = bucket.blob(f"hr_policies/{doc.id}/{doc.filename}")
             blob.delete()

@@ -59,7 +59,20 @@ pool = AsyncConnectionPool(
     conninfo=settings.DATABASE_URL, kwargs=connection_kwargs, max_size=20, open=False
 )
 
-check_pointer = AsyncPostgresSaver(pool)
+_check_pointer = None
+_graph = None
+
+def get_checkpointer():
+    global _check_pointer
+    if _check_pointer is None:
+        _check_pointer = AsyncPostgresSaver(pool)
+    return _check_pointer
+
+def get_graph():
+    global _graph
+    if _graph is None:
+        _graph = builder.compile(checkpointer=get_checkpointer())
+    return _graph
 
 
 # ──────────────── STATE ────────────────
@@ -259,7 +272,7 @@ builder.add_edge("leave_agent", END)
 builder.add_edge("complaint_agent", END)
 builder.add_edge("hr_agent", END)
 
-graph = builder.compile(checkpointer=check_pointer)
+# graph = builder.compile(checkpointer=check_pointer)  <-- Now lazy loaded via get_graph()
 
 
 # ──────────────── RUN CHAT ────────────────
@@ -272,7 +285,7 @@ async def run_chat(user_input: str, user, session_id: str):
 
     if not _db_setup_completed:
         await pool.open()
-        await check_pointer.setup()
+        await get_checkpointer().setup()
         _db_setup_completed = True
 
     current_user_var.set(user)
@@ -281,7 +294,7 @@ async def run_chat(user_input: str, user, session_id: str):
 
     t_start = time.time()
 
-    result = await graph.ainvoke(
+    result = await get_graph().ainvoke(
         {
             "messages": [HumanMessage(content=user_input)],
             "user_context": {
