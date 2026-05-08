@@ -79,7 +79,7 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APEXHR_C9436 }}
           channelId: live
           projectId: apex-hr-ca928
-          entryPoint: ./frontend
+          entryPoint: frontend
 
   # ─────────────────────────────────────────
   # JOB 2b: Deploy Preview (PR only)
@@ -106,5 +106,5 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APEXHR_C9436 }}
           projectId: apex-hr-ca928
-          entryPoint: ./frontend
+          entryPoint: frontend
           # No channelId = auto-creates a preview channel per PR with a comment

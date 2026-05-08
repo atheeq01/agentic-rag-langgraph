@@ -1,5 +1,5 @@
 import traceback
-from app.ai.rag.vector_store import vector_store
+from app.ai.rag.vector_store import get_vector_store
 
 
 def retrieve_docs(query: str, user_role: str, k: int = 3) -> str:
@@ -24,7 +24,7 @@ def retrieve_docs(query: str, user_role: str, k: int = 3) -> str:
             search_kwargs["filter"] = {"allowed_roles": {"$in": [user_role, "all"]}}
 
         # Perform similarity search using the vector store
-        docs = vector_store.similarity_search(query, k=k)
+        docs = get_vector_store().similarity_search(query, k=k)
 
         if not docs:
             print("[Retriever] No documents found.")

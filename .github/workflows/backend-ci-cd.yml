@@ -36,7 +36,7 @@ jobs:
       GOOGLE_CLIENT_ID: "dummy-for-tests"
       GOOGLE_CLIENT_SECRET: "dummy-for-tests"
       GOOGLE_REDIRECT_URI: "http://localhost:8000/auth/google/callback"
-      PINECONE_API_KEY: "dummy-for-tests"
+      PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
       GCS_BUCKET_NAME: "dummy-bucket"
       ENCRYPTION_KEY: "r-Xk_A4L3QZw9jG7t_yVvBqN2P8sE0oK5fC1mU6xWJI="
       HR_DEPARTMENT_EMAIL: "hr@example.com"

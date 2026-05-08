@@ -11,7 +11,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.models.document import Document
-from app.ai.rag.vector_store import vector_store, index
+from app.ai.rag.vector_store import get_vector_store, get_index
 
 storage_client = storage.Client()
 BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "my-enterprise-hr-docs")
@@ -51,7 +51,7 @@ def upload_and_process_document(db: Session, file: UploadFile, user_id: uuid.UUI
             chunk.metadata["document_id"] = str(doc_id)
             chunk.metadata["filename"] = file.filename
 
-        vector_store.add_documents(chunks)
+        get_vector_store().add_documents(chunks)
 
         new_doc = Document(id=doc_id, filename=file.filename, gcs_uri=gcs_uri, uploaded_by=user_id)
         db.add(new_doc)
@@ -85,7 +85,7 @@ def delete_document(db: Session, doc_id: uuid.UUID):
         return False
 
     try:
-        index.delete(filter={"document_id": str(doc_id)})
+        get_index().delete(filter={"document_id": str(doc_id)})
         print(f"🗑️ Pinecone chunks deleted for doc: {doc_id}")
     except Exception as e:
         print(f"Warning: Pinecone Delete failed: {e}")
