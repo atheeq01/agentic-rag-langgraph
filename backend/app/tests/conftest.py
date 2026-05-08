@@ -97,3 +97,11 @@ def client(db):
 
     with TestClient(app) as c:
         yield c
+
+@pytest.fixture(autouse=True)
+def mock_ai(monkeypatch):
+    """Mocks the AI chat response to prevent real Gemini API calls during tests."""
+    async def fake_run_chat(*args, **kwargs):
+        return "This is a mocked AI response."
+    
+    monkeypatch.setattr("app.api.v1.endpoints.ai_chat.run_chat", fake_run_chat)
