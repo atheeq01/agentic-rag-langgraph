@@ -19,6 +19,8 @@ env/
 !.env.example
 backend/.env
 backend/credentials.json
+key.json
+*.json.key
 
 # ── Pytest ──────────────────────────────────
 .pytest_cache/
