@@ -44,7 +44,6 @@ jobs:
         working-directory: ./frontend
         run: npm run build
         env:
-          # Public Cloud Run URL — not a secret, safe to hardcode
           VITE_API_URL: https://my-hr-backend-daxtykd7xq-el.a.run.app
 
       - name: Upload dist artifact
@@ -73,16 +72,11 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      - name: Authenticate to Google Cloud (Workload Identity Federation)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: projects/900628274880/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-          service_account: github-actions-deploy@project-0c2bab5e-90a8-4a07-ab2.iam.gserviceaccount.com
-
       - name: Deploy to Firebase Hosting (live channel)
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APEXHR_C9436 }}
           channelId: live
           projectId: apex-hr-ca928
           entryPoint: ./frontend
@@ -106,16 +100,10 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      - name: Authenticate to Google Cloud (Workload Identity Federation)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: projects/900628274880/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-          service_account: github-actions-deploy@project-0c2bab5e-90a8-4a07-ab2.iam.gserviceaccount.com
-
       - name: Deploy to Firebase Hosting (preview channel)
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APEXHR_C9436 }}
           projectId: apex-hr-ca928
           entryPoint: ./frontend
-          # No channelId = auto-creates a preview channel per PR with a comment
