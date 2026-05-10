@@ -101,8 +101,9 @@ jobs:
         run: |
           BACKEND_URL=$(gcloud run services describe my-hr-backend --region asia-south1 --format='value(status.url)' --quiet)
           FULL_CALLBACK_URL="${BACKEND_URL}/auth/google/callback"
-          gcloud secrets describe GOOGLE_REDIRECT_URI || gcloud secrets create GOOGLE_REDIRECT_URI --replication-policy="automatic"
-          echo -n "$FULL_CALLBACK_URL" | gcloud secrets versions add GOOGLE_REDIRECT_URI --data-file=- --quiet
+          gcloud secrets delete GOOGLE_REDIRECT_URI --project project-0c2bab5e-90a8-4a07-ab2 --quiet || true
+          gcloud secrets create GOOGLE_REDIRECT_URI --replication-policy="automatic" --project project-0c2bab5e-90a8-4a07-ab2
+          echo -n "$FULL_CALLBACK_URL" | gcloud secrets versions add GOOGLE_REDIRECT_URI --data-file=- --project project-0c2bab5e-90a8-4a07-ab2 --quiet
 
       - name: Print deployed URL
         run: |

@@ -92,9 +92,9 @@ jobs:
       - name: Update FRONTEND_URL to Latest
         run: |
           FRONTEND_URL="https://project-0c2bab5e-90a8-4a07-ab2.web.app"
-          gcloud secrets describe FRONTEND_URL || gcloud secrets create FRONTEND_URL --replication-policy="automatic"
-          echo -n "$FRONTEND_URL" | gcloud secrets versions add FRONTEND_URL --data-file=- --quiet
-          
+         gcloud secrets delete FRONTEND_URL --project project-0c2bab5e-90a8-4a07-ab2 --quiet || true
+          gcloud secrets create FRONTEND_URL --replication-policy="automatic" --project project-0c2bab5e-90a8-4a07-ab2
+          echo -n "$FRONTEND_URL" | gcloud secrets versions add FRONTEND_URL --data-file=- --project project-0c2bab5e-90a8-4a07-ab2 --quiet
 
   # ─────────────────────────────────────────
   # JOB 2b: Deploy Preview (PR only)
