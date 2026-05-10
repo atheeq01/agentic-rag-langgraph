@@ -1,7 +1,6 @@
 {
   "hosting": {
-    "site": "apex-hr-ca928",
-    "public": "frontend/dist",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",
