@@ -10,6 +10,8 @@ import ManageComplaintsPage from '@/pages/ManageComplaintsPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import AIChatPage from '@/pages/AIChatPage';
 import SettingsPage from '@/pages/SettingsPage';
+import PrivacyPolicy from '@/pages/PrivacyPolicy'; // New Import
+import TermsOfService from '@/pages/TermsOfService'; // New Import
 import { useAuthStore, type UserRole } from '@/store/useStore';
 
 const queryClient = new QueryClient({
@@ -21,7 +23,6 @@ const queryClient = new QueryClient({
   }
 });
 
-// Role-gated wrapper: renders children only if current user has a matching role
 function RoleGate({ roles, children }: { roles: UserRole[]; children: React.ReactNode }) {
   const user = useAuthStore(state => state.user);
   if (!user || !roles.includes(user.role)) {
@@ -35,6 +36,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+
           <Route element={<RootLayout />}>
             <Route path="/login" element={<AuthPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -57,7 +61,7 @@ export default function App() {
             } />
             <Route path="/ai-chat" element={<AIChatPage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            
+
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
