@@ -6,8 +6,6 @@ venv/
 env/
 .env
 .pytest_cache/
-.dockerignore
-Dockerfile
 *.pyc
 *.pyo
 *.pyd
