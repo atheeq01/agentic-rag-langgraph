@@ -72,21 +72,17 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      # 1. Authenticate using your existing Keyless setup
+      # 1. Authenticate using Workload Identity Federation (Keyless)
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/900628274880/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-actions-deploy@project-0c2bab5e-90a8-4a07-ab2.iam.gserviceaccount.com
 
-      # 2. Deploy to Firebase (Notice the firebaseServiceAccount parameter is GONE)
+      # 2. Deploy to Firebase using the CLI (bypasses the need for a service account secret)
       - name: Deploy to Firebase Hosting (live channel)
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          channelId: live
-          projectId: apex-hr-ca928
-          entryPoint: ./frontend
+        working-directory: ./frontend
+        run: npx firebase-tools deploy --only hosting --project apex-hr-ca928
 
   # ─────────────────────────────────────────
   # JOB 2b: Deploy Preview (PR only)
@@ -107,17 +103,17 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      # 1. Authenticate using your existing Keyless setup
+      # 1. Authenticate using Workload Identity Federation (Keyless)
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/900628274880/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-actions-deploy@project-0c2bab5e-90a8-4a07-ab2.iam.gserviceaccount.com
 
-      # 2. Deploy to Firebase (Notice the firebaseServiceAccount parameter is GONE)
+      # 2. Deploy to Firebase Hosting Preview Channel using the CLI
       - name: Deploy to Firebase Hosting (preview channel)
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          projectId: apex-hr-ca928
-          entryPoint: ./frontend
+        working-directory: ./frontend
+        run: |
+          npx firebase-tools hosting:channel:deploy pr-${{ github.event.number }} \
+            --project apex-hr-ca928 \
+            --expires 7d
