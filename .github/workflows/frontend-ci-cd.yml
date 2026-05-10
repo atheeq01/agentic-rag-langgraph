@@ -17,9 +17,12 @@ permissions:
   id-token: write
   pull-requests: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ─────────────────────────────────────────
-  # JOB 1: Build (Injecting new Firebase Config)
+  # JOB 1: Build (Using Node 24)
   # ─────────────────────────────────────────
   build:
     name: Build Frontend
@@ -29,10 +32,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Node.js 22
+      - name: Set up Node.js 24
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"  # Switched from 22 to 24
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -53,14 +56,14 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
 
       - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist
           retention-days: 1
 
   # ─────────────────────────────────────────
-  # JOB 2a: Deploy to Live (Consolidated Project)
+  # JOB 2a: Deploy to Live
   # ─────────────────────────────────────────
   deploy-live:
     name: Deploy to Firebase (Live)
@@ -73,7 +76,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download dist artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: frontend-dist
           path: frontend/dist
@@ -110,7 +113,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download dist artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: frontend-dist
           path: frontend/dist
