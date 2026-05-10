@@ -15,6 +15,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
+interface Complaint {
+  id: string;
+  title: string;
+  description: string;
+  department: string;
+  status: string;
+}
+
 export default function MyComplaintsPage() {
   const [activeTab, setActiveTab] = useState<'file' | 'history'>('file');
   const [formData, setFormData] = useState({ title: '', description: '', department: 'HR' });
@@ -27,7 +35,14 @@ export default function MyComplaintsPage() {
   });
 
   const fileMutation = useMutation({
-    mutationFn: (data: typeof formData) => api.post('/complaints/', data),
+    mutationFn: (data: typeof formData) => api.post('/complaints/', {
+      title: data.title,
+      description: data.description,
+      department: data.department,
+      priority: "medium",
+      is_anonymous: false,
+      against_user_id: null
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['complaints', 'me'] });
       setActiveTab('history');
@@ -35,7 +50,11 @@ export default function MyComplaintsPage() {
       setErrorMsg('');
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.detail || 'Failed to file complaint.');
+      const message = err.response?.data?.detail;
+      const displayError = Array.isArray(message) 
+        ? message.map((m: any) => m.msg).join(", ") 
+        : message;
+      setErrorMsg(displayError || 'Failed to submit grievance.');
     }
   });
 
@@ -174,24 +193,22 @@ export default function MyComplaintsPage() {
                 <tbody className="divide-y divide-white/10">
                   {isLoading ? (
                     <tr><td colSpan={4} className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary opacity-50" /></td></tr>
-                  ) : !myComplaints || myComplaints.length === 0 ? (
-                    <tr><td colSpan={4} className="py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] italic">No grievance history found</td></tr>
+                  ) : !Array.isArray(myComplaints) || myComplaints.length === 0 ? (
+                    <tr><td colSpan={4} className="py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] italic">No cases found</td></tr>
                   ) : (
-                    myComplaints.map((comp: any) => (
+                    myComplaints.map((comp: Complaint) => (
                       <tr key={comp.id} className="transition-colors hover:bg-white/40 group">
                         <td className="py-5 px-6">
                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-rose-500">
-                                 <Flag className="w-4 h-4" />
-                              </div>
-                              <span className="font-bold text-slate-800 text-xs uppercase tracking-tight">{comp.title}</span>
+                              <Flag className="w-4 h-4 text-rose-500" />
+                              <span className="font-bold text-slate-800 text-xs uppercase">{comp.title || 'No Title'}</span>
                            </div>
                         </td>
                         <td className="py-5 px-6">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{comp.department}</span>
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{comp.department || 'General'}</span>
                         </td>
                         <td className="py-5 px-6">
-                           <p className="text-xs text-slate-600 font-medium truncate max-w-[200px]">{comp.description}</p>
+                           <p className="text-xs text-slate-600 truncate max-w-[200px]">{comp.description}</p>
                         </td>
                         <td className="py-5 px-6 text-right">
                            <StatusBadge status={comp.status} />

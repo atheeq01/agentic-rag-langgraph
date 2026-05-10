@@ -5,6 +5,7 @@ from datetime import datetime
 class ComplaintCreate(BaseModel):
     title: str
     description: str
+    department: str
     priority: str
     against_user_id: UUID | None = None
     is_anonymous: bool = False
@@ -17,10 +18,11 @@ class ComplaintOut(BaseModel):
     id: UUID
     title: str
     description: str
+    department: str | None = None
     priority: str
     status: str
     is_anonymous: bool
-    resolution_notes: str | None = None
+    resolution_note: str | None = None
     created_at: datetime
     against_user_id: UUID | None = None
 

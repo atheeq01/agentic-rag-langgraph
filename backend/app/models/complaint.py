@@ -17,6 +17,7 @@ class Complaint(Base):
                                                               nullable=True)
     title: Mapped[str] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text)
+    department: Mapped[str] = mapped_column(String(50), nullable=True)
 
     priority: Mapped[str] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(50), default="open")

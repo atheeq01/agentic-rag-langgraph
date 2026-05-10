@@ -20,7 +20,7 @@ def create(data: ComplaintCreate, db: Session = Depends(get_db), current_user: U
 
 @router.get("/me", response_model=list[ComplaintOut])
 def my_complaints(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return complaint_service.get_my_complaints(db, current_user.id)
+    return complaint_service.get_my_complaints(db, current_user.id) or []
 
 
 @router.get("/", response_model=list[ComplaintOut])
@@ -28,6 +28,12 @@ def all_complaints(db: Session = Depends(get_db), current_user: User = Depends(g
     require_role(current_user.role, [ROLE_HR, ROLE_ADMIN])
     return complaint_service.get_all_complaints(db)
 
+
+@router.get("/team", response_model=list[ComplaintOut])
+def team_complaints(status: str = "pending", db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    require_role(current_user.role, [ROLE_HR, ROLE_ADMIN])
+    # Logic to filter by status if needed
+    return complaint_service.get_all_complaints(db) or []
 
 @router.get("/anonymous", response_model=list[ComplaintOut])
 def anonymous_complaints(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -57,3 +63,8 @@ def update(complaint_id: UUID, data: ComplaintUpdate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     return updated
+
+@router.patch("/{complaint_id}/resolve", response_model=ComplaintUpdate)
+def resolve_complaint(complaint_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    require_role(current_user.role, [ROLE_HR, ROLE_ADMIN])
+    return complaint_service.update_complaint(db, complaint_id, {"status": "resolved"})

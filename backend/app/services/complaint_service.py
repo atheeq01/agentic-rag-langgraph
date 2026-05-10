@@ -10,6 +10,7 @@ def create_complaint(db:Session,user_id:UUID,data:ComplaintCreate):
         against_user_id=data.against_user_id,
         title=data.title,
         description=data.description,
+        department=data.department,
         priority=data.priority,
         is_anonymous=data.is_anonymous
     )

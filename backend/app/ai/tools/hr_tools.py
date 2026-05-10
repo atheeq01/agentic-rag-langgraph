@@ -164,11 +164,9 @@ def draft_and_send_email(recipient: str, subject: str, body: str, is_confirmed: 
 
 
 @tool
-def submit_formal_complaint(title: str, description: str, accused_person: str, is_anonymous: bool,
-                            safe_contact_email: str = "None provided") -> str:
+def submit_formal_complaint(title: str, description: str, accused_person: str, is_anonymous: bool,department: str = "General",safe_contact_email: str = "None provided") -> str:
     """
-    Submits a formal complaint. Saves to database AND sends an email via Gmail API or SMTP.
-    Dynamically switches sender based on anonymity.
+    Submits a formal complaint. Saves to database and sends notification.
     """
     user = current_user_var.get()
     db = SessionLocal()
@@ -184,6 +182,7 @@ def submit_formal_complaint(title: str, description: str, accused_person: str, i
         complaint_data = ComplaintCreate(
             title=title,
             description=description,
+            department=department,  # Pass the department here
             priority="high",
             is_anonymous=is_anonymous
         )
