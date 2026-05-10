@@ -87,7 +87,7 @@ jobs:
         working-directory: ./backend
         run: |
           gcloud run deploy my-hr-backend \
-            --source . \
+            --source backend \
             --region asia-south1 \
             --allow-unauthenticated \
             --add-cloudsql-instances="project-0c2bab5e-90a8-4a07-ab2:asia-south1:apexhr" \
