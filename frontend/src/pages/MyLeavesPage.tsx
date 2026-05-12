@@ -43,7 +43,7 @@ export default function MyLeavesPage() {
   });
 
   const fileMutation = useMutation({
-    mutationFn: (data: typeof formData) => api.post('/leaves/apply', {
+    mutationFn: (data: typeof formData) => api.post('/leaves/', {
       start_date: data.start_date,
       end_date: data.end_date,
       leave_type: data.leave_type,
