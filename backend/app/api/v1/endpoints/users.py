@@ -8,10 +8,15 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserOut, UserUpdatePassword, UserUpdateRole, UserUpdateManager, UserAdminCreate
 from app.api.v1.deps import get_current_user
-from app.services import user_service
+from app.services import user_service, auth_service
 from app.core.security import verify_password
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+class AdminResetPassword(BaseModel):
+    new_password: str
 
 # create a new user from the admin dashboard
 @router.post("/", response_model=UserOut)
@@ -161,3 +166,18 @@ def activate_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     return {"message": f"User {user.email} activated"}
+@router.patch("/{user_id}/reset-password")
+def admin_reset_user_password(
+        user_id: UUID,
+        data: AdminResetPassword,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can reset passwords")
+
+    success, msg = auth_service.admin_reset_password(db, user_id, data.new_password)
+    if not success:
+        raise HTTPException(status_code=404, detail=msg)
+
+    return {"message": "Password successfully reset to default."}

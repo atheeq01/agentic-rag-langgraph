@@ -31,7 +31,7 @@ function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
     email: '',
     full_name: '',
     role: 'employee',
-    password: 'String123@' // Hardcoded default password as requested
+    password: 'String123@'
   });
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string; } | null>(null);
 
@@ -124,6 +124,12 @@ function EditUserModal({ isOpen, onClose, user, allUsers }: { isOpen: boolean; o
   const unlock = useMutation({
     mutationFn: () => api.post(`/auth/users/${user.id}/unlock`),
     onSuccess: () => setStatus({type: 'success', message: 'Account unlocked'})
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: () => api.patch(`/users/${user.id}/reset-password`, { new_password: 'String123@' }),
+    onSuccess: () => setStatus({type: 'success', message: 'Password reset to default: String123@'}),
+    onError: (err: any) => setStatus({type: 'error', message: err.response?.data?.detail || 'Failed to reset password'})
   });
 
   // Master save function
@@ -226,6 +232,16 @@ function EditUserModal({ isOpen, onClose, user, allUsers }: { isOpen: boolean; o
                 color="blue" 
                 isLoading={unlock.isPending}
                />
+
+               {currentUser?.role === 'admin' && (
+                 <ActionButton 
+                  onClick={() => resetPasswordMutation.mutate()} 
+                  icon={KeyRound} 
+                  label="Reset Password" 
+                  color="amber" 
+                  isLoading={resetPasswordMutation.isPending}
+                 />
+               )}
             </div>
 
             {status && <StatusBadge type={status.type} message={status.message} />}

@@ -130,3 +130,27 @@ def unlock_user_account(db: Session, target_user_id: UUID):
 
     db.commit()
     return True, f"Account for {user.email} has been successfully unlocked."
+def admin_reset_password(db: Session, target_user_id: UUID, new_password: str):
+    """Allows an admin to force reset a user's password, unlocking them in the process."""
+    stmt = select(User).where(User.id == target_user_id)
+    user = db.scalar(stmt)
+
+    if not user:
+        return False, "User not found."
+
+    validate_password_complexity(new_password)
+    new_hashed = hash_password(new_password)
+
+    user.password_hash = new_hashed
+    user.password_changed_at = datetime.now(timezone.utc)
+    
+    # Reset security locks since the admin verified the reset
+    user.failed_login_attempts = 0
+    user.account_locked_until = None
+
+    # Track in history
+    history = PasswordHistory(user_id=user.id, password_hash=new_hashed)
+    db.add(history)
+    db.commit()
+
+    return True, "Password reset successfully."
