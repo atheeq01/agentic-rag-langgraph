@@ -1,3 +1,5 @@
+from datetime import timezone, datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.complaint import Complaint
@@ -45,14 +47,20 @@ def get_complaint_by_id(db:Session,complaint_id:UUID):
     return db.scalar(stmt)
 
 # update the status or resolution notes of a complaint
-def update_complaint(db:Session,complaint_id:UUID,data:ComplaintUpdate):
-    stmt  = select(Complaint).where(Complaint.id == complaint_id)
+def update_complaint(db: Session, complaint_id: UUID, data: ComplaintUpdate, resolved_by_id: UUID = None):
+    stmt = select(Complaint).where(Complaint.id == complaint_id)
     complaint = db.scalar(stmt)
 
     if not complaint:
         return None
     if data.status:
         complaint.status = data.status
+
+        if data.status.lower() == "resolved":
+            complaint.resolved_at = datetime.now(timezone.utc)
+            if resolved_by_id:
+                complaint.resolved_by_id = resolved_by_id
+
     if data.resolution_note:
         complaint.resolution_note = data.resolution_note
 

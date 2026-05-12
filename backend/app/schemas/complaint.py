@@ -27,4 +27,7 @@ class ComplaintOut(BaseModel):
     against_user_id: UUID | None = None
     reporter_name: str | None = None
 
+    resolved_at: datetime | None = None
+    resolved_by_name: str | None = None
+
     model_config = ConfigDict(from_attributes=True)

@@ -1,7 +1,7 @@
-from pydantic import BaseModel, ConfigDict, field_validator
-from datetime import datetime,date
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from datetime import datetime, date
 from uuid import UUID
-from datetime import date
+
 
 class LeaveBase(BaseModel):
     start_date: date
@@ -21,8 +21,10 @@ class LeaveBase(BaseModel):
             raise ValueError("End date must be on or after start date.")
         return v
 
+
 class LeaveCreate(LeaveBase):
     pass
+
 
 class LeaveOut(LeaveBase):
     id: UUID
@@ -32,5 +34,30 @@ class LeaveOut(LeaveBase):
     approved_at: datetime | None = None
     created_at: datetime
 
+    applicant_name: str | None = None
+    department: str | None = None
+    approver_name: str | None = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def map_relationships(cls, data):
+        if hasattr(data, '__table__'):
+            return {
+                "start_date": data.start_date,
+                "end_date": data.end_date,
+                "leave_type": data.leave_type,
+                "reason": data.reason,
+                "id": data.id,
+                "user_id": data.user_id,
+                "status": data.status,
+                "approved_by": data.approved_by,
+                "approved_at": data.approved_at,
+                "created_at": data.created_at,
+                # Safely extract related user data
+                "applicant_name": data.user.full_name if getattr(data, "user", None) else "Unknown",
+                "department": getattr(data.user, "department", "General") if getattr(data, "user", None) else "General",
+                "approver_name": getattr(data.approver, "full_name", None) if getattr(data, "approver", None) else None,
+            }
+        return data
 
     model_config = ConfigDict(from_attributes=True)

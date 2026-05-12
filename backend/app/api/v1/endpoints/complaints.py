@@ -60,18 +60,22 @@ def get_all_complaints(db: Session = Depends(get_db), current_user: User = Depen
 
 # get team complaints with status filtering (admin and hr only)
 @router.get("/team", response_model=list[ComplaintOut])
-def team_complaints(status: str = "pending", db: Session = Depends(get_db),
-                    current_user: User = Depends(get_current_user)):
+def team_complaints(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_role(current_user.role, [ROLE_HR, ROLE_ADMIN])
-    complaints = complaint_service.get_all_complaints(db) or []
 
-    for c in complaints:
+    all_complaints = complaint_service.get_all_complaints(db) or []
+
+    for c in all_complaints:
+
         if not c.is_anonymous and c.user:
             c.reporter_name = c.user.full_name
         else:
             c.reporter_name = "Anonymous"
 
-    return complaints
+        if c.resolved_by_user:
+            c.resolved_by_name = c.resolved_by_user.full_name
+
+    return all_complaints
 
 
 # retrieve a list of all anonymous complaints (admin and hr only)
@@ -100,7 +104,7 @@ def update(complaint_id: UUID, data: ComplaintUpdate, db: Session = Depends(get_
            current_user: User = Depends(get_current_user)):
     require_role(current_user.role, [ROLE_HR, ROLE_ADMIN])
 
-    updated = complaint_service.update_complaint(db, complaint_id, data)
+    updated = complaint_service.update_complaint(db, complaint_id, data, resolved_by_id=current_user.id)
     if not updated:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
@@ -112,4 +116,7 @@ def update(complaint_id: UUID, data: ComplaintUpdate, db: Session = Depends(get_
 def resolve_complaint(complaint_id: UUID, db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
     require_role(current_user.role, [ROLE_HR, ROLE_ADMIN])
-    return complaint_service.update_complaint(db, complaint_id, {"status": "resolved"})
+    update_data = ComplaintUpdate(status="resolved", resolution_note=None)
+
+    # Pass the current_user.id here as well
+    return complaint_service.update_complaint(db, complaint_id, update_data, resolved_by_id=current_user.id)

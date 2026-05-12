@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta, date
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
 
 from app.models.leave import Leave
@@ -26,7 +26,7 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
             )
 
     # Balance Check and Deduction
-    if leave_in.leave_type == "Annual":
+    if leave_in.leave_type == "annual":
         if user.annual_leave_balance < duration:
             raise HTTPException(
                 status_code=400,
@@ -34,7 +34,7 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
             )
         user.annual_leave_balance -= duration
 
-    elif leave_in.leave_type == "Sick":
+    elif leave_in.leave_type == "sick":
         if user.sick_leave_balance < duration:
             raise HTTPException(
                 status_code=400,
@@ -50,7 +50,10 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
 
 # get the leave, who log in now
 def get_my_leaves(db: Session, user_id: UUID):
-    stmt = select(Leave).where(Leave.user_id == user_id)
+    stmt = select(Leave).where(Leave.user_id == user_id).options(
+        joinedload(Leave.user),
+        joinedload(Leave.approver)
+    )
     return db.scalars(stmt).all()
 
 # view the leave based on user
@@ -61,7 +64,10 @@ def get_team_leaves(db: Session, requester_id: UUID, status: str | None = None):
     if not requester:
         return []
 
-    stmt = select(Leave)
+    stmt = select(Leave).options(
+        joinedload(Leave.user),
+        joinedload(Leave.approver)
+    )
     """
     role: 
         - Admin/HR see all

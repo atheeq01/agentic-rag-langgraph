@@ -66,7 +66,38 @@ export default function MyLeavesPage() {
       setErrorMsg('All fields are required.');
       return;
     }
+
+    const duration = calculateDuration(formData.start_date, formData.end_date);
+    const daysInAdvance = Math.ceil((new Date(formData.start_date).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+
+    if (duration > 3 && daysInAdvance < 14) {
+      setErrorMsg(`Your request is for ${duration} days. Leaves exceeding 3 days must be submitted at least 14 days in advance.`);
+      return;
+    }
+
     fileMutation.mutate(formData);
+  };
+
+  const calculateDuration = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const diffTime = Math.abs(new Date(end).getTime() - new Date(start).getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+  };
+
+  const duration = calculateDuration(formData.start_date, formData.end_date);
+  
+  const daysInAdvance = formData.start_date
+    ? Math.ceil((new Date(formData.start_date).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  const showAdvanceWarning = duration > 3 && daysInAdvance < 14;
+
+  const getMinStartDate = () => {
+    const minDate = new Date();
+    if (formData.leave_type !== 'Sick') {
+      minDate.setDate(minDate.getDate() + 14); 
+    }
+    return minDate.toISOString().split("T")[0];
   };
 
   const StatusBadge = ({ status }: { status: string }) => {
@@ -84,6 +115,17 @@ export default function MyLeavesPage() {
         {status}
       </span>
     );
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Pending';
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const calculateTotalDays = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const diffTime = Math.abs(new Date(end).getTime() - new Date(start).getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   };
 
   const leaveOptions = [
@@ -135,14 +177,21 @@ export default function MyLeavesPage() {
                   <AlertCircle className="w-4 h-4" /> {errorMsg}
                 </div>
               )}
-              
+
+              <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3 text-amber-800 text-[11px] font-bold leading-relaxed shadow-sm">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <span className="uppercase tracking-wider">Policy Notice:</span> Leaves exceeding 3 days must be submitted at least 14 days in advance.
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Start Date</label>
                   <div className="relative">
                     <input 
                       type="date" 
-                      min={new Date().toISOString().split("T")[0]}
+                      min={getMinStartDate()}
                       value={formData.start_date} 
                       onChange={e => setFormData({...formData, start_date: e.target.value})}
                       className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/5 transition-all appearance-none" 
@@ -202,15 +251,29 @@ export default function MyLeavesPage() {
                   ) : myLeaves.length === 0 ? (
                     <tr><td colSpan={3} className="py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">No leave applications found</td></tr>
                   ) : (
-                    myLeaves.map((leave) => (
-                      <tr key={leave.id} className="hover:bg-white/40 transition-colors group">
-                        <td className="py-5 px-6 font-bold text-slate-800 text-xs uppercase tracking-tight">
-                          {leave.leave_type}
+                    myLeaves.map((leave: any) => (
+                      <tr key={leave.id} className="hover:bg-white/40 transition-colors group align-top">
+                        <td className="py-5 px-6">
+                          <div className="font-bold text-slate-800 text-xs uppercase tracking-tight">{leave.leave_type}</div>
+                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Applied: {formatDate(leave.created_at)}</div>
                         </td>
-                        <td className="py-5 px-6 text-[10px] font-black text-slate-400 uppercase italic tracking-widest">
-                          {leave.start_date} — {leave.end_date}
+                        <td className="py-5 px-6">
+                          <div className="text-xs font-bold text-slate-700">{calculateTotalDays(leave.start_date, leave.end_date)} Days</div>
+                          <div className="text-[9px] font-black text-slate-400 uppercase italic tracking-widest mt-0.5">
+                            {leave.start_date} to {leave.end_date}
+                          </div>
                         </td>
-                        <td className="py-5 px-6 text-right"><StatusBadge status={leave.status} /></td>
+                        <td className="py-5 px-6 text-right">
+                          <div className="flex flex-col items-end justify-center gap-1">
+                            <StatusBadge status={leave.status} />
+                            {leave.status !== 'pending' && leave.approved_at && (
+                              <div className="flex flex-col items-end mt-1">
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">By: {leave.approver_name || 'Manager'}</span>
+                                <span className="text-[8px] font-bold text-slate-400">{formatDate(leave.approved_at)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}
