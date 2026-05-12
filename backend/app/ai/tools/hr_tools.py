@@ -5,6 +5,7 @@ import os
 import smtplib
 from datetime import datetime
 from langchain_core.tools import tool
+from fastapi import HTTPException
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -68,8 +69,7 @@ def get_current_date() -> str:
 
 @tool
 def check_sql_leave_balance(employee_id: str) -> str:
-    """Check PTO and sick leave balance, name, and email for a given employee ID."""
-    # just security check
+    """Check annual leave and sick leave balance, name, and email for a given employee ID."""
     user = current_user_var.get()
     if str(user.id) != employee_id and user.role not in ["hr", "admin"]:
         return "ERROR: You do not have permission to view another employee's leave balance."
@@ -80,11 +80,8 @@ def check_sql_leave_balance(employee_id: str) -> str:
         if not emp:
             return f"Employee {employee_id} not found."
 
-        approved_leaves = db.query(Leave).filter(Leave.user_id == emp.id, Leave.status == 'approved').all()
-        used_days = sum((l.end_date - l.start_date).days for l in approved_leaves) if approved_leaves else 0
-        pto_balance = 14 - used_days
-
-        return f"Name: {emp.full_name}, Email: {emp.email}, ID: {employee_id}. Balance: {pto_balance} PTO, 7 sick leaves."
+        # Fetch the actual database balances
+        return f"Name: {emp.full_name}, Email: {emp.email}, ID: {employee_id}. Balance: {emp.annual_leave_balance} Annual Leave, {emp.sick_leave_balance} Sick Leave."
     finally:
         db.close()
 
@@ -97,36 +94,38 @@ def hr_vector_search(query: str) -> str:
 
 
 @tool
-def apply_leave_tool(start_date: str, end_date: str, reason: str) -> str:
-    """Apply leave request in the database for the logged-in user."""
+def apply_leave_tool(start_date: str, end_date: str, leave_type: str, reason: str) -> str:
+    """Apply leave request in the database. leave_type MUST be 'annual' or 'sick'."""
     user = current_user_var.get()
     db = SessionLocal()
     try:
-        locked_user = db.query(User).filter(User.id == user.id).with_for_update().first()
+        l_type = leave_type.lower()
+        if "annual" in l_type or "pto" in l_type:
+            l_type = "annual"
+        elif "sick" in l_type:
+            l_type = "sick"
+        else:
+            return "Failed: leave_type must be either 'annual' or 'sick'."
 
-        if not locked_user:
-            return f"User {user.full_name} not found."
+        leave_data = LeaveCreate(
+            start_date=start_date,
+            end_date=end_date,
+            leave_type=l_type,
+            reason=reason
+        )
 
-        approved_leaves = db.query(Leave).filter(Leave.user_id == locked_user.id, Leave.status == 'approved').all()
-        used_days = sum((l.end_date- l.start_date).days for l in approved_leaves) if approved_leaves else 0
-        pto_balance = 14 - used_days
-
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        end = datetime.strptime(end_date, "%Y-%m-%d")
-        requested_days = (end - start).days
-
-        if requested_days > pto_balance:
-            db.rollback()
-            return f"Failed: You requested {requested_days} days, but only have {pto_balance} PTO days left."
-
-
-        leave_data = LeaveCreate(start_date=start_date, end_date=end_date, leave_type="pto", reason=reason)
         leave = leave_service.apply_leave(db, user_id=user.id, leave_in=leave_data)
+
         print("🔥 LEAVE SAVED:", leave.id)
         return "Leave successfully applied."
+
+    except HTTPException as he:
+        db.rollback()
+        return f"Failed to apply leave: {he.detail}"
+
     except Exception as e:
         db.rollback()
-        return f"Failed to apply leave: {str(e)}"
+        return f"Failed to apply leave due to system error: {str(e)}"
     finally:
         db.close()
 
