@@ -41,12 +41,24 @@ export default function AuthPage() {
         employee_id: data.user.employee_id,
         email: data.user.email,
         role: data.user.role,
-        name: data.user.full_name || data.user.email.split('@')[0]
+        name: data.user.full_name || data.user.email.split('@')[0],
+        annual_leave_balance: data.user.annual_leave_balance,
+        sick_leave_balance: data.user.sick_leave_balance
       });
       navigate('/dashboard');
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.detail || 'Login failed. Please check your credentials.');
+      // Extract the detailed message (e.g., "3 attempts remaining") from the backend
+      const backendDetail = err.response?.data?.detail;
+      
+      if (typeof backendDetail === 'string') {
+        setErrorMsg(backendDetail);
+      } else if (Array.isArray(backendDetail)) {
+        // Handles FastAPI validation error arrays
+        setErrorMsg(backendDetail[0]?.msg || 'Authentication failed');
+      } else {
+        setErrorMsg('Login failed. Please check your credentials.');
+      }
     }
   });
 
@@ -64,7 +76,9 @@ export default function AuthPage() {
         employee_id: data.user.employee_id,
         email: data.user.email,
         role: data.user.role,
-        name: data.user.full_name || fullName || data.user.email.split('@')[0]
+        name: data.user.full_name || fullName || data.user.email.split('@')[0],
+        annual_leave_balance: data.user.annual_leave_balance,
+        sick_leave_balance: data.user.sick_leave_balance
       });
       navigate('/dashboard');
     },
@@ -89,7 +103,9 @@ export default function AuthPage() {
         employee_id: data.user.employee_id,
         email: data.user.email,
         role: data.user.role,
-        name: data.user.full_name || data.user.email.split('@')[0]
+        name: data.user.full_name || data.user.email.split('@')[0],
+        annual_leave_balance: data.user.annual_leave_balance,
+        sick_leave_balance: data.user.sick_leave_balance
       });
       navigate('/dashboard');
     },
@@ -97,6 +113,10 @@ export default function AuthPage() {
       setErrorMsg(err.response?.data?.detail || 'Failed to update password. Please check your credentials.');
     }
   });
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
 
   const validatePassword = (pwd: string) => {
     if (pwd.length < 8) return "Password must be at least 8 characters.";
@@ -108,7 +128,17 @@ export default function AuthPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (!validateEmail(email)) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
     if (mode === 'login') {
+      if (!password) {
+        setErrorMsg('Password is required.');
+        return;
+      }
       loginMutation.mutate();
     } else if (mode === 'register') {
       if (!fullName.trim()) {

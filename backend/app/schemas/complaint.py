@@ -25,5 +25,6 @@ class ComplaintOut(BaseModel):
     resolution_note: str | None = None
     created_at: datetime
     against_user_id: UUID | None = None
+    reporter_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

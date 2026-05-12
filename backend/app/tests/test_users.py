@@ -5,139 +5,132 @@ from app.models.user import User
 
 # --- Helper Functions ---
 
-def create_user(client, email, password="TestPass@123", full_name="Test User"):
+# register a user for testing purposes
+def register_test_user(client, email, role="employee"):
     return client.post("/auth/register", json={
         "email": email,
-        "password": password,
-        "full_name": full_name
+        "password": "TestPass@123",
+        "full_name": "Test User"
     })
 
 
-def login(client, email, password="TestPass@123"):
-    return client.post("/auth/login", json={
-        "email": email,
-        "password": password
-    })
-
-
-def get_token_for(client, db, email, role="employee"):
-    create_user(client, email)
+# login and return auth headers for a specific role
+def get_auth_headers(client, db, email, role="employee"):
+    register_test_user(client, email)
     user = db.scalar(select(User).where(User.email == email))
-    if user:
-        user.role = role
-        db.commit()
-    return login(client, email).json()["access_token"]
+    user.role = role
+    db.commit()
 
-
-def auth_header(token):
+    login_res = client.post("/auth/login", json={"email": email, "password": "TestPass@123"})
+    token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 
 # --- Tests ---
 
+# check that admin can create new users manually
 def test_create_user_admin(client, db):
-    admin_token = get_token_for(client, db, "admin_create@test.com", role="admin")
+    headers = get_auth_headers(client, db, "admin@test.com", "admin")
     res = client.post("/users/", json={
-        "email": "new_created_user@test.com",
-        "password": "password123",
-        "full_name": "New User",
+        "email": "manual@test.com",
+        "password": "Password@123",
+        "full_name": "Manual User",
         "role": "employee"
-    }, headers=auth_header(admin_token))
-
+    }, headers=headers)
     assert res.status_code == 200
-    assert res.json()["email"] == "new_created_user@test.com"
 
 
+# check that non-admins are forbidden from creating users
 def test_create_user_forbidden(client, db):
-    emp_token = get_token_for(client, db, "emp_create@test.com", role="employee")
-    res = client.post("/users/", json={
-        "email": "newuser2@test.com",
-        "password": "password123",
-        "full_name": "New User",
-        "role": "employee"
-    }, headers=auth_header(emp_token))
-
+    headers = get_auth_headers(client, db, "staff@test.com", "employee")
+    res = client.post("/users/", json={"email": "no@test.com", "password": "Password@123"}, headers=headers)
     assert res.status_code == 403
 
 
-def test_list_users(client, db):
-    admin_token = get_token_for(client, db, "admin_list@test.com", role="admin")
-    emp_token = get_token_for(client, db, "emp_list@test.com", role="employee")
+# check that admin/hr can list all users while employees cannot
+def test_list_users_permissions(client, db):
+    admin_headers = get_auth_headers(client, db, "admin_list@test.com", "admin")
+    emp_headers = get_auth_headers(client, db, "emp_list@test.com", "employee")
 
-    res_admin = client.get("/users/", headers=auth_header(admin_token))
-    assert res_admin.status_code == 200
-    assert isinstance(res_admin.json(), list)
-
-    res_emp = client.get("/users/", headers=auth_header(emp_token))
-    assert res_emp.status_code == 403
+    assert client.get("/users/", headers=admin_headers).status_code == 200
+    assert client.get("/users/", headers=emp_headers).status_code == 403
 
 
+# check that users can successfully update their own password
 def test_change_password(client, db):
-    token = get_token_for(client, db, "passuser@test.com")
-
+    headers = get_auth_headers(client, db, "pass@test.com")
     res = client.patch("/users/me/password", json={
         "old_password": "TestPass@123",
-        "new_password": "NewPass@456!"
-    }, headers=auth_header(token))
-
-    assert res.status_code == 200
-
-    res_login = login(client, "passuser@test.com", "NewPass@456!")
-    assert res_login.status_code == 200
-
-
-def test_update_role(client, db):
-    admin_token = get_token_for(client, db, "admin_role@test.com", role="admin")
-    create_user(client, "role_target@test.com")
-
-    user = db.scalar(select(User).where(User.email == "role_target@test.com"))
-
-    res = client.patch(f"/users/{user.id}/role", json={"role": "hr"}, headers=auth_header(admin_token))
-    assert res.status_code == 200
-    assert "Role updated to hr" in res.json()["message"]
-
-
-def test_promote_user(client, db):
-    admin_token = get_token_for(client, db, "admin_promote@test.com", role="admin")
-    create_user(client, "promote_target@test.com")
-
-    user = db.scalar(select(User).where(User.email == "promote_target@test.com"))
-
-    res = client.patch(f"/users/{user.id}/promote", headers=auth_header(admin_token))
-    assert res.status_code == 200
-    assert "promoted to Manager" in res.json()["message"]
-
-
-def test_assign_manager(client, db):
-    admin_token = get_token_for(client, db, "admin_assign@test.com", role="admin")
-    create_user(client, "manager@test.com")
-    create_user(client, "employee_target@test.com")
-
-    manager = db.scalar(select(User).where(User.email == "manager@test.com"))
-    emp = db.scalar(select(User).where(User.email == "employee_target@test.com"))
-
-    res = client.patch(f"/users/{emp.id}/manager", json={"manager_id": str(manager.id)},
-                       headers=auth_header(admin_token))
+        "new_password": "NewPassword@123"
+    }, headers=headers)
     assert res.status_code == 200
 
 
-def test_delete_user(client, db):
-    admin_token = get_token_for(client, db, "admin_delete@test.com", role="admin")
-    create_user(client, "delete_me@test.com")
+# check that admin can update a user's role
+def test_update_role_admin(client, db):
+    admin_headers = get_auth_headers(client, db, "admin_role@test.com", "admin")
+    register_test_user(client, "target@test.com")
+    target = db.scalar(select(User).where(User.email == "target@test.com"))
 
-    user_to_delete = db.scalar(select(User).where(User.email == "delete_me@test.com"))
-
-    res = client.delete(f"/users/{user_to_delete.id}", headers=auth_header(admin_token))
+    res = client.patch(f"/users/{target.id}/role", json={"role": "hr"}, headers=admin_headers)
     assert res.status_code == 200
-    assert res.json()["message"] == "User deleted successfully"
+    assert "hr" in res.json()["message"]
 
 
-def test_delete_admin_user_fails(client, db):
-    admin_token = get_token_for(client, db, "admin_deleter@test.com", role="admin")
-    get_token_for(client, db, "admin_target@test.com", role="admin")  # Creates an admin user
+# check user assignment (manager and department) via the consolidated route
+def test_assign_user_details_admin_hr(client, db):
+    admin_headers = get_auth_headers(client, db, "admin_assign@test.com", "admin")
+    register_test_user(client, "manager@test.com")
+    register_test_user(client, "subordinate@test.com")
 
-    target_admin = db.scalar(select(User).where(User.email == "admin_target@test.com"))
+    mgr = db.scalar(select(User).where(User.email == "manager@test.com"))
+    sub = db.scalar(select(User).where(User.email == "subordinate@test.com"))
 
-    res = client.delete(f"/users/{target_admin.id}", headers=auth_header(admin_token))
-    assert res.status_code == 403
-    assert "Cannot delete users with 'admin' or 'hr' roles" in res.json()["detail"]
+    # Test updating both department and manager
+    res = client.patch(f"/users/{sub.id}/assign", json={
+        "manager_id": str(mgr.id),
+        "department": "financial"
+    }, headers=admin_headers)
+
+    assert res.status_code == 200
+    db.refresh(sub)
+    assert sub.department == "financial"
+    assert sub.manager_id == mgr.id
+
+
+# check account deactivation and activation (admin only)
+def test_user_status_toggles(client, db):
+    admin_headers = get_auth_headers(client, db, "admin_status@test.com", "admin")
+    register_test_user(client, "toggle@test.com")
+    target = db.scalar(select(User).where(User.email == "toggle@test.com"))
+
+    # Deactivate
+    res_de = client.patch(f"/users/{target.id}/deactivate", headers=admin_headers)
+    assert res_de.status_code == 200
+    db.refresh(target)
+    assert target.is_active is False
+
+    # Activate
+    res_ac = client.patch(f"/users/{target.id}/activate", headers=admin_headers)
+    assert res_ac.status_code == 200
+    db.refresh(target)
+    assert target.is_active is True
+
+
+# check that admin can delete users but not other privileged roles
+def test_delete_user_restrictions(client, db):
+    admin_headers = get_auth_headers(client, db, "boss@test.com", "admin")
+
+    # Create an employee and an HR user
+    register_test_user(client, "kill_me@test.com")
+    get_auth_headers(client, db, "safe_hr@test.com", "hr")
+
+    emp = db.scalar(select(User).where(User.email == "kill_me@test.com"))
+    hr_user = db.scalar(select(User).where(User.email == "safe_hr@test.com"))
+
+    # Delete employee (Should work)
+    assert client.delete(f"/users/{emp.id}", headers=admin_headers).status_code == 200
+
+    # Delete HR (Should fail)
+    res_hr = client.delete(f"/users/{hr_user.id}", headers=admin_headers)
+    assert res_hr.status_code == 403

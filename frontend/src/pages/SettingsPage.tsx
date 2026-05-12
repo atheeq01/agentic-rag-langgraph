@@ -10,11 +10,13 @@ import {
   AlertCircle,
   Loader2,
   TrendingUp,
-  UserCog,
   Trash2,
   X,
-  ChevronDown,
-  Unlock
+  Unlock,
+  UserCheck,
+  UserX,
+  Edit2,
+  Save
 } from 'lucide-react';
 import { useAuthStore, hasRole } from '@/store/useStore';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -22,203 +24,363 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
-function AddUserModal({
-  isOpen,
-  onClose
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) {
+// --- ADD USER MODAL ---
+function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void; }) {
   const queryClient = useQueryClient();
-
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
     full_name: '',
-    role: 'employee'
+    role: 'employee',
+    password: 'String123@' // Hardcoded default password as requested
   });
-
-  const [status, setStatus] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string; } | null>(null);
 
   const mutation = useMutation({
     mutationFn: (data: any) => api.post('/users/', data),
     onSuccess: () => {
       setStatus({ type: 'success', message: 'User created successfully!' });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-
-      setTimeout(() => {
-        onClose();
-        setStatus(null);
-        setFormData({
-          email: '',
-          password: '',
-          full_name: '',
-          role: 'employee'
-        });
+      setTimeout(() => { 
+        onClose(); 
+        setStatus(null); 
+        setFormData({ email: '', full_name: '', role: 'employee', password: 'String123@' }); 
       }, 1200);
     },
-    onError: (error: any) => {
-      setStatus({
-        type: 'error',
-        message:
-          error.response?.data?.detail || 'Failed to create user.'
-      });
-    }
+    onError: (error: any) => setStatus({ type: 'error', message: error.response?.data?.detail || 'Failed to create user.' })
   });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    mutation.mutate(formData);
-  };
 
   if (!isOpen) return null;
 
   return createPortal(
     <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100]"
-          />
-
-          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-              className="w-full max-w-md bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-900 rounded-lg">
-                    <UserPlus className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="font-bold text-slate-900">Add New User</h3>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-slate-500" />
-                </button>
-              </div>
-
-              <form
-                onSubmit={handleSubmit}
-                className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar"
-              >
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="John Doe"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold text-sm"
-                    value={formData.full_name}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, full_name: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="user@company.com"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold text-sm"
-                    value={formData.email}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Temporary Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold text-sm"
-                    value={formData.password}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">System Role</label>
-                  <div className="relative">
-                    <select
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer font-bold text-sm"
-                      value={formData.role}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, role: e.target.value }))}
-                    >
-                      <option value="employee">Employee</option>
-                      <option value="manager">Manager</option>
-                      <option value="hr">HR</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-
-                {status && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={cn(
-                      "p-3 rounded-xl flex items-center gap-2.5 text-[10px] font-black border uppercase tracking-widest",
-                      status.type === 'success'
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                        : "bg-rose-50 text-rose-700 border-rose-100"
-                    )}
-                  >
-                    {status.type === 'success' ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4" />
-                    )}
-                    {status.message}
-                  </motion.div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={mutation.isPending}
-                  className="w-full py-3.5 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2 uppercase text-xs tracking-widest shadow-xl shadow-slate-900/10"
-                >
-                  {mutation.isPending && (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  )}
-                  Create Account
-                </button>
-              </form>
-            </motion.div>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100]" />
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
+        <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="w-full max-w-md bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh] border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="flex items-center gap-3"><div className="p-2 bg-slate-900 rounded-lg"><UserPlus className="w-5 h-5 text-white" /></div><h3 className="font-bold text-slate-900">Add New User</h3></div>
+            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X className="w-5 h-5 text-slate-500" /></button>
           </div>
-        </>
-      )}
+          <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(formData); }} className="p-6 space-y-4 overflow-y-auto">
+            
+            <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 mb-2">
+              <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest text-center">
+                Default Password: <span className="text-slate-900 ml-1">String123@</span>
+              </p>
+            </div>
+
+            <InputField label="Full Name" value={formData.full_name} onChange={(v: string) => setFormData(p => ({...p, full_name: v}))} placeholder="John Doe" />
+            <InputField label="Email Address" type="email" value={formData.email} onChange={(v: string) => setFormData(p => ({...p, email: v}))} placeholder="user@company.com" />
+            <SelectField label="System Role" value={formData.role} onChange={(v: string) => setFormData(p => ({...p, role: v}))} options={['employee', 'manager', 'hr', 'admin']} />
+            
+            {status && <StatusBadge type={status.type} message={status.message} />}
+            <button type="submit" disabled={mutation.isPending} className="w-full py-3.5 mt-2 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest">
+              {mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Create Account
+            </button>
+          </form>
+        </motion.div>
+      </div>
     </AnimatePresence>,
     document.body
   );
 }
 
+// --- EDIT USER MODAL ---
+function EditUserModal({ isOpen, onClose, user, allUsers }: { isOpen: boolean; onClose: () => void; user: any; allUsers: any[] }) {
+  const queryClient = useQueryClient();
+  const currentUser = useAuthStore((state: any) => state.user);
+  const [status, setStatus] = useState<{type: 'success'|'error', message: string} | null>(null);
+
+  // Local form state so changes don't fire instantly
+  const [editForm, setEditForm] = useState({
+    role: '',
+    department: '',
+    manager_id: ''
+  });
+
+  // Sync state when a user is selected
+  useEffect(() => {
+    if (user) {
+      setEditForm({
+        role: user.role || 'employee',
+        department: user.department || '',
+        manager_id: user.manager_id || ''
+      });
+    }
+  }, [user]);
+
+  const updateAssignment = useMutation({
+    mutationFn: (data: any) => api.patch(`/users/${user.id}/assign`, data)
+  });
+
+  const updateRole = useMutation({
+    mutationFn: (role: string) => api.patch(`/users/${user.id}/role`, { role })
+  });
+
+  const toggleStatus = useMutation({
+    mutationFn: () => api.patch(`/users/${user.id}/${user.is_active === false ? 'activate' : 'deactivate'}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] })
+  });
+
+  const unlock = useMutation({
+    mutationFn: () => api.post(`/auth/users/${user.id}/unlock`),
+    onSuccess: () => setStatus({type: 'success', message: 'Account unlocked'})
+  });
+
+  // Master save function
+  const handleSaveDetails = async () => {
+    try {
+      if (editForm.role !== user.role) {
+        await updateRole.mutateAsync(editForm.role);
+      }
+      if (editForm.department !== user.department || editForm.manager_id !== user.manager_id) {
+        await updateAssignment.mutateAsync({ department: editForm.department, manager_id: editForm.manager_id || null });
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setStatus({type: 'success', message: 'User details updated successfully!'});
+      setTimeout(() => { setStatus(null); onClose(); }, 1200);
+    } catch (error) {
+      setStatus({type: 'error', message: 'Failed to update details.'});
+    }
+  };
+
+  if (!isOpen || !user) return null;
+
+  const isSaving = updateRole.isPending || updateAssignment.isPending;
+
+  return createPortal(
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[110]" />
+      <div className="fixed inset-0 z-[111] flex items-center justify-center p-4">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-lg bg-white rounded-[2rem] shadow-2xl border border-slate-200 overflow-hidden">
+          <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-lg">
+                {user.full_name?.substring(0,2).toUpperCase()}
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg">{user.full_name}</h3>
+                <p className="text-xs text-slate-500 font-medium">{user.email}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X className="w-5 h-5 text-slate-500" /></button>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <SelectField 
+                label="System Role" 
+                value={editForm.role} 
+                onChange={(v: string) => setEditForm(p => ({ ...p, role: v }))} 
+                options={['employee', 'manager', 'hr', 'admin']} 
+              />
+              
+              <SelectField 
+                label="Department" 
+                value={editForm.department} 
+                onChange={(v: string) => setEditForm(p => ({ ...p, department: v, manager_id: '' }))} // Clear manager when dept changes
+                options={['', 'financial', 'operational', 'hr']} 
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Assign To Manager</label>
+              <select 
+                value={editForm.manager_id} 
+                onChange={(e) => setEditForm(p => ({ ...p, manager_id: e.target.value }))}
+                className="custom-select w-full !py-3 !bg-slate-50 !border-slate-100"
+              >
+                <option value="">No Manager / Independent</option>
+                {allUsers?.filter(m => 
+                  m.id !== user.id && 
+                  ['admin', 'manager', 'hr'].includes(m.role) &&
+                  (editForm.department ? m.department === editForm.department : true) // Filters by local state department
+                ).map(m => (
+                  <option key={m.id} value={m.id}>{m.full_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <button 
+              onClick={handleSaveDetails}
+              disabled={isSaving}
+              className="w-full py-3 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest mt-2"
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Updates
+            </button>
+
+            <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-100">
+               <ActionButton 
+                onClick={() => toggleStatus.mutate()} 
+                icon={user.is_active === false ? UserCheck : UserX} 
+                label={user.is_active === false ? "Activate Account" : "Deactivate Account"} 
+                color={user.is_active === false ? "emerald" : "amber"} 
+                isLoading={toggleStatus.isPending}
+                disabled={user.id === currentUser?.id}
+               />
+               <ActionButton 
+                onClick={() => unlock.mutate()} 
+                icon={Unlock} 
+                label="Unlock Account" 
+                color="blue" 
+                isLoading={unlock.isPending}
+               />
+            </div>
+
+            {status && <StatusBadge type={status.type} message={status.message} />}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>,
+    document.body
+  );
+}
+
+// --- MAIN PAGE COMPONENT ---
+export default function SettingsPage() {
+  const user = useAuthStore((state: any) => state.user);
+  const [activeTab, setActiveTab] = useState<'security' | 'team'>('security');
+  const isAdmin = user?.role === 'admin';
+  const isManagement = hasRole(user, 'admin', 'hr', 'manager');
+
+  return (
+    <div className="space-y-6 md:space-y-8 max-w-6xl mx-auto p-4 md:p-0">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">Settings</h1>
+        <p className="text-sm text-slate-500">Manage your account security and team permissions.</p>
+      </div>
+
+      <div className="flex gap-1 p-1 bg-white/40 backdrop-blur-md border border-white/20 rounded-2xl w-fit">
+        <TabButton active={activeTab === 'security'} onClick={() => setActiveTab('security')} icon={KeyRound} label="Security" />
+        {isManagement && <TabButton active={activeTab === 'team'} onClick={() => setActiveTab('team')} icon={Users} label="Team" />}
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+          {activeTab === 'security' ? <SecurityTab /> : <TeamTab isAdmin={isAdmin} />}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function TeamTab({ isAdmin }: { isAdmin: boolean }) {
+  const user = useAuthStore((state: any) => state.user);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<any>(null);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
+  const queryClient = useQueryClient();
+
+  const { data: users, isLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => api.get('/users/').then((res: any) => res.data)
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/users/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] })
+  });
+
+  return (
+    <div className="space-y-6">
+      <AddUserModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <EditUserModal isOpen={!!userToEdit} onClose={() => setUserToEdit(null)} user={userToEdit} allUsers={users || []} />
+
+      <div className="glass-panel overflow-hidden border border-white/40 shadow-2xl">
+        <div className="p-6 border-b border-white/20 flex items-center justify-between bg-white/30">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600"><Users className="w-5 h-5" /></div>
+            <h2 className="text-lg font-bold text-slate-900">User Management</h2>
+          </div>
+          {isAdmin && (
+            <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-[10px] font-black rounded-xl uppercase tracking-widest">
+              <UserPlus className="w-4 h-4" /> Add User
+            </button>
+          )}
+        </div>
+
+        <div className="w-full overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-50/50 text-left">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Info</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                <tr><td colSpan={4} className="p-12 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-300" /></td></tr>
+              ) : (
+                users?.map((u: any) => (
+                  <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs border border-white shadow-sm">
+                          {u.full_name?.substring(0,2).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900 text-sm">{u.full_name}</span>
+                          <span className="text-[10px] font-bold text-slate-400 italic">{u.email}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border",
+                        u.is_active !== false ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-100 text-slate-400 border-slate-200"
+                      )}>
+                        {u.is_active !== false ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("px-2 py-1 rounded-lg text-[9px] font-black border uppercase tracking-widest", ROLE_STYLES[u.role])}>{u.role}</span>
+                        {u.department && <span className="px-2 py-1 rounded-lg text-[9px] font-black border border-slate-200 bg-white text-slate-500 uppercase tracking-widest">{u.department}</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {isAdmin && (
+                          <>
+                            <button onClick={() => setUserToEdit(u)} className="p-2 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => setUserToDelete(u)} 
+                              disabled={u.role === 'admin' || u.role === 'hr'}
+                              className={cn("p-2 rounded-xl transition-all", u.role === 'admin' || u.role === 'hr' ? "opacity-20" : "text-rose-400 hover:text-rose-600 hover:bg-rose-50")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <ConfirmationModal
+        isOpen={!!userToDelete}
+        title="Delete User"
+        message={`Delete ${userToDelete?.full_name}?`}
+        onConfirm={() => deleteMutation.mutate(userToDelete.id, { onSuccess: () => setUserToDelete(null) })}
+        onClose={() => setUserToDelete(null)}
+        isLoading={deleteMutation.isPending}
+        variant="danger"
+      />
+    </div>
+  );
+}
+
+// --- HELPER COMPONENTS ---
 const ROLE_STYLES: Record<string, string> = {
   admin: 'bg-rose-50 text-rose-700 border-rose-100',
   hr: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -226,80 +388,47 @@ const ROLE_STYLES: Record<string, string> = {
   employee: 'bg-blue-50 text-blue-700 border-blue-100'
 };
 
-export default function SettingsPage() {
-  const user = useAuthStore(state => state.user);
-  const [activeTab, setActiveTab] = useState<'security' | 'team'>('security');
-  const isAdmin = user?.role === 'admin';
-  const isManagement = hasRole(user, 'admin', 'hr', 'manager');
-
+function InputField({ label, value, onChange, placeholder, type = "text" }: any) {
   return (
-    <div className="space-y-6 md:space-y-8 max-w-6xl mx-auto">
-      <div className="flex flex-col gap-1 px-1">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
-          Settings
-        </h1>
-        <p className="text-sm md:text-base text-slate-500">
-          Manage your account security and team permissions.
-        </p>
-      </div>
-
-      <div className="flex gap-1 p-1 bg-white/40 backdrop-blur-md border border-white/20 rounded-2xl w-fit max-w-full overflow-x-auto no-scrollbar">
-        <TabButton
-          active={activeTab === 'security'}
-          onClick={() => setActiveTab('security')}
-          icon={KeyRound}
-          label="Account Security"
-        />
-        {isManagement && (
-          <TabButton
-            active={activeTab === 'team'}
-            onClick={() => setActiveTab('team')}
-            icon={Users}
-            label="Team Management"
-          />
-        )}
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-        >
-          {activeTab === 'security' ? (
-            <SecurityTab />
-          ) : (
-            <TeamTab isAdmin={isAdmin} />
-          )}
-        </motion.div>
-      </AnimatePresence>
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{label}</label>
+      <input type={type} required placeholder={placeholder} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold text-sm" value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
 
-interface TabButtonProps {
-  active: boolean;
-  onClick: () => void;
-  icon: any;
-  label: string;
+function SelectField({ label, value, onChange, options, disabled }: any) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{label}</label>
+      <select disabled={disabled} className="custom-select w-full !py-2.5 !bg-slate-50 !border-slate-100 !px-4" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o: string) => <option key={o} value={o}>{o ? o.charAt(0).toUpperCase() + o.slice(1) : 'None'}</option>)}
+      </select>
+    </div>
+  );
 }
 
-function TabButton({ active, onClick, icon: Icon, label }: TabButtonProps) {
+function ActionButton({ onClick, icon: Icon, label, color, isLoading, disabled }: any) {
+  const colors: any = {
+    emerald: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border-emerald-100",
+    amber: "text-amber-600 bg-amber-50 hover:bg-amber-100 border-amber-100",
+    blue: "text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100",
+    purple: "text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-100"
+  };
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300 text-xs md:text-sm font-bold whitespace-nowrap",
-        active
-          ? "bg-white text-primary shadow-sm ring-1 ring-slate-200"
-          : "text-slate-500 hover:text-slate-900 hover:bg-white/40"
-      )}
-    >
-      <Icon className={cn("w-4 h-4", active ? "text-primary" : "text-slate-400")} />
+    <button disabled={disabled || isLoading} onClick={onClick} className={cn("flex items-center gap-2 px-3 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-30", colors[color])}>
+      {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon className="w-3.5 h-3.5" />}
       {label}
     </button>
+  );
+}
+
+function StatusBadge({ type, message }: any) {
+  return (
+    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className={cn("p-3 rounded-xl flex items-center gap-2.5 text-[10px] font-black border uppercase tracking-widest", type === 'success' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100")}>
+      {type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+      {message}
+    </motion.div>
   );
 }
 
@@ -432,179 +561,10 @@ function SecurityTab() {
   );
 }
 
-function TeamTab({ isAdmin }: { isAdmin: boolean }) {
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [activeRoleMenu, setActiveRoleMenu] = useState<string | null>(null);
-  const [userToDelete, setUserToDelete] = useState<any>(null);
-  const [teamStatus, setTeamStatus] = useState<{type: 'success'|'error', message: string} | null>(null);
-  const queryClient = useQueryClient();
-
-  const { data: users, isLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => api.get('/users').then(res => res.data)
-  });
-
-  const promoteMutation = useMutation({
-    mutationFn: (userId: string) => api.patch(`/users/${userId}/promote`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] })
-  });
-
-  const updateRoleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: string }) =>
-      api.patch(`/users/${userId}/role`, { role }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setActiveRoleMenu(null);
-    }
-  });
-
-  const deleteUserMutation = useMutation({
-    mutationFn: (userId: string) => api.delete(`/users/${userId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] })
-  });
-
-  const unlockMutation = useMutation({
-    mutationFn: (userId: string) => api.post(`/auth/users/${userId}/unlock`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setTeamStatus({ type: 'success', message: 'Account successfully unlocked.' });
-      setTimeout(() => setTeamStatus(null), 3000);
-    },
-    onError: (error: any) => {
-      setTeamStatus({ type: 'error', message: error.response?.data?.detail || 'Failed to unlock account.' });
-      setTimeout(() => setTeamStatus(null), 3000);
-    }
-  });
-
+function TabButton({ active, onClick, icon: Icon, label }: any) {
   return (
-    <div className="space-y-6">
-      <AddUserModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-
-      <div className="glass-panel overflow-hidden border border-white/40 shadow-2xl">
-        <div className="p-5 md:p-6 border-b border-white/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/30">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-50 rounded-2xl text-purple-600">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 leading-tight">User Management</h2>
-              <p className="text-[10px] md:text-xs font-bold text-slate-400 italic">Manage employee roles and permissions.</p>
-            </div>
-          </div>
-          {isAdmin && (
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-[10px] font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 uppercase tracking-widest"
-            >
-              <UserPlus className="w-4 h-4" /> Add User
-            </button>
-          )}
-        </div>
-
-        {teamStatus && (
-          <div className={cn("px-6 py-3 border-b text-[10px] font-black uppercase tracking-widest flex items-center gap-2", teamStatus.type === 'success' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100")}>
-            {teamStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-            {teamStatus.message}
-          </div>
-        )}
-
-        <div className="w-full overflow-x-auto custom-scrollbar">
-          <table className="w-full min-w-[700px]">
-            <thead>
-              <tr className="bg-white/40 text-left">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">User</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Role</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Status</th>
-                {isAdmin && <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {isLoading ? (
-                <tr><td colSpan={isAdmin ? 4 : 3} className="p-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></td></tr>
-              ) : (
-                users?.map((u: any) => (
-                  <tr key={u.id} className="hover:bg-white/40 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 border border-white flex items-center justify-center text-slate-600 font-black text-xs shadow-sm">
-                          {u.full_name ? u.full_name.substring(0, 2).toUpperCase() : '??'}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-slate-900 text-sm truncate">{u.full_name || 'Unnamed User'}</span>
-                          <span className="text-[10px] font-bold text-slate-400 italic truncate">{u.email}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black border uppercase tracking-widest", ROLE_STYLES[u.role] || ROLE_STYLES.employee)}>
-                        <Shield className="w-3 h-3" /> {u.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
-                      </span>
-                    </td>
-                    {isAdmin && (
-                      <td className="px-6 py-4 text-right">
-                        <div className={cn("flex items-center justify-end gap-2 transition-all duration-200", activeRoleMenu === u.id ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
-                          {u.role === 'employee' && (
-                            <button onClick={() => promoteMutation.mutate(u.id)} disabled={promoteMutation.isPending} className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 text-white text-[9px] font-black rounded-lg hover:shadow-lg transition-all"><TrendingUp className="w-3 h-3" /> PROMOTE</button>
-                          )}
-                          <div className="relative">
-                            <button onClick={(e) => { e.stopPropagation(); setActiveRoleMenu(activeRoleMenu === u.id ? null : u.id); }} className={cn("p-2 rounded-xl border transition-all", activeRoleMenu === u.id ? "bg-slate-100 border-slate-200 text-primary" : "hover:bg-white border-transparent hover:border-slate-200 text-slate-600")}><UserCog className="w-4 h-4" /></button>
-                            {activeRoleMenu === u.id && (
-                              <div className="absolute right-0 top-full mt-2 z-50">
-                                <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl p-1.5 min-w-[140px]">
-                                  {(['employee', 'manager', 'hr', 'admin'] as const).map(r => (
-                                    <button key={r} onClick={() => updateRoleMutation.mutate({ userId: u.id, role: r })} disabled={updateRoleMutation.isPending} className={cn("w-full text-left px-3 py-2.5 text-[10px] font-black rounded-xl hover:bg-slate-50 transition-colors uppercase flex items-center justify-between tracking-widest", u.role === r ? "text-primary bg-primary/5" : "text-slate-600")}>{r}{updateRoleMutation.isPending && updateRoleMutation.variables?.role === r && <Loader2 className="w-3 h-3 animate-spin" />}</button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <button 
-                            onClick={() => unlockMutation.mutate(u.id)}
-                            disabled={unlockMutation.isPending}
-                            title="Unlock Account"
-                            className="p-2 rounded-xl border hover:bg-emerald-50 border-transparent hover:border-emerald-100 text-emerald-600 transition-all"
-                          >
-                            {unlockMutation.isPending && unlockMutation.variables === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
-                          </button>
-                          <button 
-                            onClick={() => setUserToDelete(u)} 
-                            disabled={deleteUserMutation.isPending || u.role === 'admin' || u.role === 'hr'} 
-                            className={cn("p-2 rounded-xl border transition-all", u.role === 'admin' || u.role === 'hr' ? "opacity-30 cursor-not-allowed border-transparent text-slate-400" : "hover:bg-rose-50 border-transparent hover:border-rose-100 text-rose-600")}
-                          >
-                            {deleteUserMutation.isPending && deleteUserMutation.variables === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <ConfirmationModal
-        isOpen={!!userToDelete}
-        title="Delete User"
-        message={`Are you sure you want to permanently delete ${userToDelete?.full_name || userToDelete?.email}? This action cannot be undone.`}
-        confirmLabel="Delete User"
-        onConfirm={() => {
-          if (userToDelete) {
-            deleteUserMutation.mutate(userToDelete.id, {
-              onSuccess: () => setUserToDelete(null)
-            });
-          }
-        }}
-        onClose={() => setUserToDelete(null)}
-        isLoading={deleteUserMutation.isPending}
-        variant="danger"
-      />
-    </div>
+    <button onClick={onClick} className={cn("flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all text-xs font-bold whitespace-nowrap", active ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-900")}>
+      <Icon className={cn("w-4 h-4", active ? "text-slate-900" : "text-slate-400")} /> {label}
+    </button>
   );
 }

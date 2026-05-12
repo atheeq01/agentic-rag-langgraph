@@ -76,7 +76,6 @@ async def google_callback(code: str, state: str, db: Session = Depends(get_db)):
 
     db.commit()
 
-    # FIX: Return a self-closing HTML page instead of a RedirectResponse
     html_content = """
     <!DOCTYPE html>
     <html>

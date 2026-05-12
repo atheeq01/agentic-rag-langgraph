@@ -1,4 +1,3 @@
-# app/api/v1/auth.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
@@ -13,7 +12,7 @@ from app.api.v1.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-
+# create a new user from the register page
 @router.post("/register", response_model=dict)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
     stmt = select(User).where(User.email == user_in.email)
@@ -26,10 +25,9 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     token = auth_service.create_user_token(user)
     return {"access_token": token, "token_type": "bearer"}
 
-
+# login page authentication with login-form
 @router.post("/login-form", response_model=dict)
 def login(credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # FIX: Unpack the 3 variables returned from authenticate_user
     user, error_msg, needs_reset = auth_service.authenticate_user(db, credentials.username, credentials.password)
 
     if not user:
@@ -42,10 +40,9 @@ def login(credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depe
         "needs_password_reset": needs_reset
     }
 
-
+# create the login page with JSON format
 @router.post("/login", response_model=dict)
 def login_json(credentials: UserLogin, db: Session = Depends(get_db)):
-    # FIX: Unpack the 3 variables returned from authenticate_user
     user, error_msg, needs_reset = auth_service.authenticate_user(db, credentials.email, credentials.password)
 
     if not user:
@@ -57,7 +54,7 @@ def login_json(credentials: UserLogin, db: Session = Depends(get_db)):
         "needs_password_reset": needs_reset
     }
 
-
+# change password after login
 @router.post("/change-password")
 def change_password(payload: UserUpdatePassword, db: Session = Depends(get_db),
                     current_user: User = Depends(get_current_user)):
@@ -73,31 +70,31 @@ def change_password(payload: UserUpdatePassword, db: Session = Depends(get_db),
 
     return {"message": msg}
 
-
+# get the details about the current user details
 @router.get("/me", tags=["auth"])
 def get_my_profile(current_user: User = Depends(get_current_user)):
     return {
-        "message": "Authentication successful! The lock is working.",
+        "message": "Authentication successful!",
         "employee_id": str(current_user.id),
         "email": current_user.email,
-        "role": current_user.role
+        "full_name": current_user.full_name,
+        "role": current_user.role,
+        "annual_leave_balance": current_user.annual_leave_balance,
+        "sick_leave_balance": current_user.sick_leave_balance
     }
 
-
+# unlock the user (admin only)
 @router.post("/users/{user_id}/unlock", tags=["admin", "auth"])
 def admin_unlock_account(
         user_id: UUID,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    # Role-based access control: Only Admins or HR can unlock accounts
     if current_user.role not in ["admin", "hr"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to perform this action."
         )
-
-    # Note: Calling auth_service instead of admin_service
     success, message = auth_service.unlock_user_account(db, user_id)
 
     if not success:

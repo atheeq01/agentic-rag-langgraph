@@ -24,7 +24,24 @@ export default function DashboardPage() {
     queryFn: () => api.get('/complaints/me').then(res => res.data)
   });
 
-  const leaveBalanceDays = 14 - (myLeaves?.filter((l: any) => l.status === 'approved').length || 0) * 2;
+  // Helper to calculate days between two dates
+  const calculateDays = (start: string, end: string) => {
+    const s = new Date(start);
+    const e = new Date(end);
+    return Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  // Logic to calculate remaining balances dynamically
+  const calculateRemaining = (type: string, baseBalance: number) => {
+    const used = myLeaves
+      ?.filter((l: any) => l.status === 'approved' && l.leave_type.toLowerCase().includes(type))
+      .reduce((acc: number, l: any) => acc + calculateDays(l.start_date, l.end_date), 0) || 0;
+    return baseBalance - used;
+  };
+
+  // Get base balances from the updated /auth/me profile
+  const annualRemaining = calculateRemaining('annual', user?.annual_leave_balance || 20);
+  const sickRemaining = calculateRemaining('sick', user?.sick_leave_balance || 10);
   const activeComplaintsCount = myComplaints?.filter((c: any) => c.status !== 'resolved').length || 0;
   const teamLeavesCount = teamLeaves?.length || 0;
 
@@ -55,49 +72,44 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Leave Balance */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-panel p-5 md:p-6 flex flex-col justify-between group hover:border-primary/30 transition-colors"
-        >
+        {/* Annual Leave Card */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-5 md:p-6 group hover:border-blue-300 transition-all flex flex-col justify-between">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">LEAVE BALANCE</p>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">ANNUAL BALANCE</p>
               <h2 className="text-3xl md:text-4xl font-black text-slate-900">
-                 {loadingLeaves ? <Loader2 className="w-8 h-8 animate-spin text-primary" /> : <>{leaveBalanceDays} <span className="text-lg text-muted-foreground font-bold italic">DAYS</span></>}
+                {loadingLeaves ? <Loader2 className="w-8 h-8 animate-spin text-primary" /> : <>{annualRemaining} <span className="text-lg text-muted-foreground italic">DAYS</span></>}
               </h2>
             </div>
-            <div className="p-3 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+            <div className="p-3 rounded-2xl bg-blue-50 text-blue-500 group-hover:scale-110 transition-transform">
               <Calendar className="w-5 h-5 md:w-6 md:h-6" />
             </div>
           </div>
           <div className="mt-6">
             <Link to="/leaves" className="w-full sm:w-auto inline-flex items-center justify-center py-2.5 px-5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10">
-              APPLY FOR LEAVE
+              BOOK ANNUAL
             </Link>
           </div>
         </motion.div>
 
-        {/* Active Complaints */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="glass-panel p-5 md:p-6 flex flex-col justify-between group hover:border-rose-200 transition-colors"
-        >
+        {/* Sick Leave Card */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-panel p-5 md:p-6 group hover:border-rose-300 transition-all flex flex-col justify-between">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">ACTIVE COMPLAINTS</p>
-              <h2 className="text-3xl md:text-4xl font-black text-slate-900 tabular-nums">
-                 {loadingComplaints ? <Loader2 className="w-8 h-8 animate-spin text-rose-400" /> : activeComplaintsCount}
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">SICK BALANCE</p>
+              <h2 className="text-3xl md:text-4xl font-black text-slate-900">
+                {loadingLeaves ? <Loader2 className="w-8 h-8 animate-spin text-rose-400" /> : <>{sickRemaining} <span className="text-lg text-muted-foreground italic">DAYS</span></>}
               </h2>
             </div>
-            <div className="p-3 rounded-2xl bg-rose-50 text-rose-400 group-hover:scale-110 transition-transform">
-               <Flag className="w-5 h-5 md:w-6 md:h-6" />
+            <div className="p-3 rounded-2xl bg-rose-50 text-rose-500 group-hover:scale-110 transition-transform">
+              <Clock className="w-5 h-5 md:w-6 md:h-6" />
             </div>
           </div>
-          <div className="mt-6 invisible">Placeholder</div>
+          <div className="mt-6">
+            <Link to="/leaves" className="w-full sm:w-auto inline-flex items-center justify-center py-2.5 px-5 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/10">
+              BOOK SICK
+            </Link>
+          </div>
         </motion.div>
 
         {/* Team Leaves — only for Manager/HR/Admin */}

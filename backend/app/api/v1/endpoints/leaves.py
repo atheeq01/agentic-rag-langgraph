@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
+
+from app.core.email_utils import TEMPLATES, send_system_notification
 from app.db.session import get_db
 from app.schemas.leave import LeaveCreate, LeaveOut
 from app.services import leave_service
@@ -13,10 +15,9 @@ from app.models.user import User
 router = APIRouter(prefix="/leaves", tags=["leaves"])
 
 
-@router.post("/apply", response_model=LeaveOut)
+@router.post("/", response_model=LeaveOut)
 def apply_leave(leave_in: LeaveCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return leave_service.apply_leave(db, current_user.id, leave_in)
-
 
 @router.get("/me", response_model=list[LeaveOut])
 def my_leaves(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -31,17 +32,26 @@ def team_leaves(status: str | None = None, db: Session = Depends(get_db),
 
 
 @router.post("/{leave_id}/action", response_model=LeaveOut)
-def action_leave(
-    leave_id: UUID,
-    approve: bool,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def action_leave(leave_id: UUID, approve: bool, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user)):
     require_role(current_user.role, [ROLE_MANAGER, ROLE_HR, ROLE_ADMIN])
 
     leave = leave_service.approve_leave(db, leave_id, current_user.id, approve)
-
     if not leave:
         raise HTTPException(status_code=404, detail="Leave not found")
+
+    status_text = "Approved" if approve else "Rejected"
+    color = "#10b981" if approve else "#e11d48"
+
+    html = TEMPLATES["LEAVE_DECISION"].format(
+        status=status_text,
+        color=color,
+        start=leave.start_date.strftime("%Y-%m-%d"),
+        end=leave.end_date.strftime("%Y-%m-%d"),
+        manager=current_user.full_name,
+        note="Actioned via HR Management Portal"
+    )
+
+    send_system_notification(leave.user.email, f"Leave Request Update: {status_text}", html)
 
     return leave

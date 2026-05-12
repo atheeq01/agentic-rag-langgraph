@@ -10,6 +10,8 @@ MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATION_MINUTES = 15
 PASSWORD_EXPIRATION_DAYS = 90
 
+
+# create a new user from the register page
 def create_user(db: Session, email: str, password: str, full_name: str | None = None, role: str = "employee"):
     validate_password_complexity(password)
 
@@ -29,45 +31,60 @@ def create_user(db: Session, email: str, password: str, full_name: str | None = 
     db.commit()
     return user
 
+# login page authentication
 def authenticate_user(db: Session, email: str, password: str):
     stmt = select(User).where(User.email == email)
     user = db.scalar(stmt)
 
+    # check the user is existing or not
     if not user:
-        return None, "Invalid credentials", False
+        return None, "Invalid credentials.", False
 
+    # check the user is lock or not
     if not user.is_active:
         return None, "Account is disabled. Please contact an administrator.", False
 
-    # check the account lock or not
+    # check the user is lock or not and how much time left to unlock
     if user.account_locked_until:
-        if user.account_locked_until.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc):
-            return None, "Account is temporarily locked due to multiple failed login attempts.", False
+        now = datetime.now(timezone.utc)
+        locked_until = user.account_locked_until.replace(tzinfo=timezone.utc)
+
+        if locked_until > now:
+            remaining = locked_until - now
+            minutes = int(remaining.total_seconds() // 60)
+            seconds = int(remaining.total_seconds() % 60)
+            return None, f"Account locked. Try again in {minutes}m {seconds}s.", False
         else:
             user.account_locked_until = None
             user.failed_login_attempts = 0
-    # verify the password and save the failed attempts
+            db.commit()
+
+    # verify password and track remaining tries
     if not verify_password(password, user.password_hash):
         user.failed_login_attempts += 1
-        error_msg = "Invalid credentials"
+        remaining_tries = MAX_FAILED_ATTEMPTS - user.failed_login_attempts
 
         if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
             user.account_locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
-            error_msg = f"Account locked due to {MAX_FAILED_ATTEMPTS} failed login attempts. Try again in {LOCKOUT_DURATION_MINUTES} minutes."
+            error_msg = f"Account locked for {LOCKOUT_DURATION_MINUTES} minutes due to excessive failed attempts."
+        else:
+            error_msg = f"Invalid credentials. {remaining_tries} attempts remaining."
+
         db.commit()
         return None, error_msg, False
 
+    # reset the failed attempts and reset the lock time
     user.failed_login_attempts = 0
     user.account_locked_until = None
     db.commit()
-    needs_reset=False
+    needs_reset = False
     if user.password_changed_at:
         days_since_change = (datetime.now(timezone.utc) - user.password_changed_at.replace(tzinfo=timezone.utc)).days
         if days_since_change >= PASSWORD_EXPIRATION_DAYS:
             needs_reset = True
     return user, None, needs_reset
 
-
+# change the password
 def change_password(db: Session, user: User, old_password: str, new_password: str):
     """Handles password rotation, verifying the old password, and preventing reuse."""
     if not verify_password(old_password, user.password_hash):
@@ -92,11 +109,12 @@ def change_password(db: Session, user: User, old_password: str, new_password: st
 
     return True, "Password updated successfully."
 
+# create the user token
 def create_user_token(user):
     data = {"sub": str(user.id), "role": user.role}
     return create_access_token(data)
 
-
+# unlock the user (admin only)
 def unlock_user_account(db: Session, target_user_id: UUID):
     """Manually unlocks a user account and ensures it is active."""
     stmt = select(User).where(User.id == target_user_id)
@@ -105,7 +123,7 @@ def unlock_user_account(db: Session, target_user_id: UUID):
     if not user:
         return False, "User not found."
 
-    # Reset the security locks
+    # reset the security locks
     user.failed_login_attempts = 0
     user.account_locked_until = None
     user.is_active = True  # Ensure the account is active

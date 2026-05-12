@@ -8,6 +8,8 @@ interface UserData {
   email: string;
   role: UserRole;
   name: string;
+  annual_leave_balance?: number;
+  sick_leave_balance?: number;
 }
 
 interface AuthState {
@@ -30,8 +32,6 @@ export const useAuthStore = create<AuthState>()(
       login: (token, user) => set({ isAuthenticated: true, token, user }),
       logout: () => {
         set({ isAuthenticated: false, token: null, user: null });
-        // Clear query cache on logout to prevent stale data leaking
-        window.location.href = '/login';
       },
       setHydrated: (v) => set({ isHydrated: v }),
     }),

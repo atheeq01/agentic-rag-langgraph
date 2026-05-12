@@ -19,8 +19,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Basic automatic logout if we receive a 401 Unauthorized globally
-    if (error.response?.status === 401) {
+    const isLoginPage = window.location.pathname === '/login' || window.location.pathname === '/';
+    
+    // Only auto-logout if the error is 401 AND we aren't already trying to login
+    if (error.response?.status === 401 && !isLoginPage) {
       useAuthStore.getState().logout();
     }
     return Promise.reject(error);

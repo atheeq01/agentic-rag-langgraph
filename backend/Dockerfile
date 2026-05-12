@@ -37,13 +37,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 
-# Create a non-root user (no need to chown /app here yet)
 RUN useradd -m -r appuser
 
-# Switch to the non-root user
+
 USER appuser
 
-# FIX: Copy application code AND set ownership to appuser in one step
+
 COPY --chown=appuser:appuser . .
 
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
