@@ -15,6 +15,7 @@ test_engine = create_engine(
 
 # HIJACK THE BACKEND'S ENGINE BEFORE IT LOADS
 import app.db.session
+import unittest.mock as mock
 app.db.session.engine = test_engine
 
 import langgraph.checkpoint.postgres.aio
@@ -26,6 +27,11 @@ import pinecone
 import app.core.email_utils
 app.core.email_utils.send_system_notification = lambda *args, **kwargs: None
 
+email_mock = mock.patch("app.core.email_utils.send_system_notification", return_value=None)
+email_mock.start()
+
+mock.patch("smtplib.SMTP").start()
+mock.patch("smtplib.SMTP_SSL").start()
 
 class MockAsyncPostgresSaver(MemorySaver):
     async def setup(self):
