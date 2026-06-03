@@ -91,8 +91,6 @@ def test_get_me_no_token(client):
     res = client.get("/auth/me")
     assert res.status_code == 401
 
-
-
 # verifies that an account locks after 5 consecutive failed login attempts.
 def test_account_lockout_on_multiple_failed_attempts(client, db):
     create_user(client, "lockout@test.com", "ValidPass@123")
@@ -112,8 +110,7 @@ def test_password_reuse_is_prevented(client, db):
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Attempt to change password to the exact same one
-    res = client.post("/auth/change-password", json={
+    res = client.patch("/users/me/password", json={
         "old_password": "InitialPass@123",
         "new_password": "InitialPass@123"
     }, headers=headers)

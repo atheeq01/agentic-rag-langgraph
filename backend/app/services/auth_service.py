@@ -1,156 +1,120 @@
-from uuid import UUID
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+import pytest
 from app.models.user import User
-from datetime import datetime, timedelta, timezone, tzinfo
-from app.core.security import hash_password, verify_password, create_access_token,validate_password_complexity
-from app.models.user import PasswordHistory
+from sqlalchemy import select
 
-MAX_FAILED_ATTEMPTS = 5
-LOCKOUT_DURATION_MINUTES = 15
-PASSWORD_EXPIRATION_DAYS = 90
+# register a new user helper
+def create_user(client, email="test@test.com", password="TestPass@123"):
+    return client.post("/auth/register", json={
+        "email": email,
+        "password": password,
+        "full_name": "Test User"
+    })
 
+# check successful user registration
+def test_register_success(client):
+    res = create_user(client)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["token_type"] == "bearer"
 
-# create a new user from the register page
-def create_user(db: Session, email: str, password: str, full_name: str | None = None, role: str = "employee"):
-    validate_password_complexity(password)
+# check prevention of duplicate email registration
+def test_register_duplicates(client):
+    create_user(client)
+    res = create_user(client)
+    assert res.status_code == 400
+    assert "already" in res.json()["detail"].lower()
 
-    hashed_password = hash_password(password)
-    user = User(
-        email=email,
-        password_hash=hashed_password,
-        full_name=full_name,
-        role=role,
-        password_changed_at=datetime.now(timezone.utc)
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    history = PasswordHistory(user_id=user.id, password_hash=hashed_password)
-    db.add(history)
-    db.commit()
-    return user
+# check validation for invalid registration data
+def test_register_invalid_data(client):
+    res = client.post("/auth/register", json={
+        "email": "invalid_email",
+        "password": "short",
+        "full_name": "",
+    })
+    assert res.status_code == 422
 
-# login page authentication
-def authenticate_user(db: Session, email: str, password: str):
-    stmt = select(User).where(User.email == email)
-    user = db.scalar(stmt)
+# check successful login using JSON
+def test_login_json_success(client):
+    create_user(client)
+    res = client.post("/auth/login", json={
+        "email": "test@test.com",
+        "password": "TestPass@123"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["token_type"] == "bearer"
+    assert "access_token" in data
 
-    # check the user is existing or not
-    if not user:
-        return None, "Invalid credentials.", False
+# check login failure with invalid credentials
+def test_login_json_invalid(client):
+    res = client.post("/auth/login", json={
+        "email": "fake@test.com",
+        "password": "wrong"
+    })
+    assert res.status_code == 401
 
-    # check the user is lock or not
-    if not user.is_active:
-        return None, "Account is disabled. Please contact an administrator.", False
+# check successful login using OAuth2 form data
+def test_login_form_success(client):
+    create_user(client)
+    res = client.post("/auth/login-form", data={
+        "username": "test@test.com",
+        "password": "TestPass@123"
+    })
+    assert res.status_code == 200
 
-    # check the user is lock or not and how much time left to unlock
-    if user.account_locked_until:
-        now = datetime.now(timezone.utc)
-        locked_until = user.account_locked_until.replace(tzinfo=timezone.utc)
-
-        if locked_until > now:
-            remaining = locked_until - now
-            minutes = int(remaining.total_seconds() // 60)
-            seconds = int(remaining.total_seconds() % 60)
-            return None, f"Account locked. Try again in {minutes}m {seconds}s.", False
-        else:
-            user.account_locked_until = None
-            user.failed_login_attempts = 0
-            db.commit()
-
-    # verify password and track remaining tries
-    if not verify_password(password, user.password_hash):
-        user.failed_login_attempts += 1
-        remaining_tries = MAX_FAILED_ATTEMPTS - user.failed_login_attempts
-
-        if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
-            user.account_locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
-            error_msg = f"Account locked for {LOCKOUT_DURATION_MINUTES} minutes due to excessive failed attempts."
-        else:
-            error_msg = f"Invalid credentials. {remaining_tries} attempts remaining."
-
-        db.commit()
-        return None, error_msg, False
-
-    # reset the failed attempts and reset the lock time
-    user.failed_login_attempts = 0
-    user.account_locked_until = None
-    db.commit()
-    needs_reset = False
-    if user.password_changed_at:
-        days_since_change = (datetime.now(timezone.utc) - user.password_changed_at.replace(tzinfo=timezone.utc)).days
-        if days_since_change >= PASSWORD_EXPIRATION_DAYS:
-            needs_reset = True
-    return user, None, needs_reset
-
-# change the password
-def change_password(db: Session, user: User, old_password: str, new_password: str):
-    """Handles password rotation, verifying the old password, and preventing reuse."""
-    if not verify_password(old_password, user.password_hash):
-        return False, "Incorrect current password."
-
-    validate_password_complexity(new_password)
-
-    stmt = select(PasswordHistory).where(PasswordHistory.user_id == user.id)
-    past_passwords = db.scalars(stmt).all()
-
-    for record in past_passwords:
-        if verify_password(new_password, record.password_hash):
-            return False, "You cannot reuse a previously used password."
-
-    new_hashed = hash_password(new_password)
-    user.password_hash = new_hashed
-    user.password_changed_at = datetime.now(timezone.utc)
-
-    history = PasswordHistory(user_id=user.id, password_hash=new_hashed)
-    db.add(history)
+# check that deactivated accounts cannot log in
+def test_login_deactivated_user(client, db):
+    create_user(client, "inactive@test.com")
+    user = db.scalar(select(User).where(User.email == "inactive@test.com"))
+    user.is_active = False
     db.commit()
 
-    return True, "Password updated successfully."
+    res = client.post("/auth/login", json={
+        "email": "inactive@test.com",
+        "password": "TestPass@123"
+    })
+    assert res.status_code == 401
+    assert "disabled" in res.json()["detail"].lower()
 
-# create the user token
-def create_user_token(user):
-    data = {"sub": str(user.id), "role": user.role}
-    return create_access_token(data)
+# check retrieving current user profile with valid token
+def test_get_me_success(client):
+    create_user(client)
+    login_res = client.post("/auth/login", json={"email": "test@test.com", "password": "TestPass@123"})
+    token = login_res.json()["access_token"]
 
-# unlock the user (admin only)
-def unlock_user_account(db: Session, target_user_id: UUID):
-    """Manually unlocks a user account and ensures it is active."""
-    stmt = select(User).where(User.id == target_user_id)
-    user = db.scalar(stmt)
+    res = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    assert res.json()["email"] == "test@test.com"
 
-    if not user:
-        return False, "User not found."
+# check that profile access is denied without token
+def test_get_me_no_token(client):
+    res = client.get("/auth/me")
+    assert res.status_code == 401
 
-    # reset the security locks
-    user.failed_login_attempts = 0
-    user.account_locked_until = None
-    user.is_active = True  # Ensure the account is active
+# verifies that an account locks after 5 consecutive failed login attempts.
+def test_account_lockout_on_multiple_failed_attempts(client, db):
+    create_user(client, "lockout@test.com", "ValidPass@123")
 
-    db.commit()
-    return True, f"Account for {user.email} has been successfully unlocked."
-def admin_reset_password(db: Session, target_user_id: UUID, new_password: str):
-    """Allows an admin to force reset a user's password, unlocking them in the process."""
-    stmt = select(User).where(User.id == target_user_id)
-    user = db.scalar(stmt)
+    for _ in range(5):
+        res = client.post("/auth/login", json={"email": "lockout@test.com", "password": "WrongPassword!"})
+        assert res.status_code == 401
 
-    if not user:
-        return False, "User not found."
+    res = client.post("/auth/login", json={"email": "lockout@test.com", "password": "WrongPassword!"})
+    assert res.status_code == 401
+    assert "account locked" in res.json()["detail"].lower()
 
-    validate_password_complexity(new_password)
-    new_hashed = hash_password(new_password)
+# ensures users cannot reuse a password stored in their PasswordHistory
+def test_password_reuse_is_prevented(client, db):
+    create_user(client, "reuse@test.com", "InitialPass@123")
+    login_res = client.post("/auth/login", json={"email": "reuse@test.com", "password": "InitialPass@123"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
 
-    user.password_hash = new_hashed
-    user.password_changed_at = datetime.now(timezone.utc)
-    
-    # Reset security locks since the admin verified the reset
-    user.failed_login_attempts = 0
-    user.account_locked_until = None
 
-    # Track in history
-    history = PasswordHistory(user_id=user.id, password_hash=new_hashed)
-    db.add(history)
-    db.commit()
+    res = client.patch("/users/me/password", json={
+        "old_password": "InitialPass@123",
+        "new_password": "InitialPass@123"
+    }, headers=headers)
 
-    return True, "Password reset successfully."
+    assert res.status_code == 400
+    assert "cannot reuse" in res.json()["detail"].lower()

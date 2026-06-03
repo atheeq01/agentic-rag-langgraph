@@ -11,7 +11,6 @@ on:
     paths:
       - 'backend/**'
 
-# Required for Workload Identity Federation (keyless GCP auth)
 permissions:
   contents: read
   id-token: write
@@ -21,17 +20,15 @@ env:
 
 jobs:
   # ─────────────────────────────────────────
-  # JOB 1: Run Tests (always, on push & PR)
+  # JOB 1: Run Tests
   # ─────────────────────────────────────────
   test:
     name: Run Pytest
     runs-on: ubuntu-latest
 
     env:
-      # Minimal env vars needed so the app imports without crashing.
-      # Tests use SQLite in-memory (configured in conftest.py), so no real DB needed.
       DATABASE_URL: "sqlite:///:memory:"
-      SECRET_KEY: "test-secret-key-for-ci"
+      SECRET_KEY: ${{ secrets.TEST_SECRET_KEY }}
       ALGORITHM: "HS256"
       ACCESS_TOKEN_EXPIRE_MINUTES: "60"
       FRONTEND_URL: "http://localhost:5173"
@@ -40,11 +37,11 @@ jobs:
       GOOGLE_CLIENT_SECRET: "dummy-for-tests"
       GOOGLE_REDIRECT_URI: "http://localhost:8000/auth/google/callback"
       PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-      GCS_BUCKET_NAME: "dummy-bucket"
-      ENCRYPTION_KEY: "r-Xk_A4L3QZw9jG7t_yVvBqN2P8sE0oK5fC1mU6xWJI="
-      HR_DEPARTMENT_EMAIL: "hr@example.com"
-      SYSTEM_EMAIL_ADDRESS: "sys@example.com"
-      SYSTEM_EMAIL_APP_PASSWORD: "dummy"
+      GCS_BUCKET_NAME: ${{ vars.GCS_BUCKET_NAME }}
+      ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
+      HR_DEPARTMENT_EMAIL: ${{ secrets.HR_DEPARTMENT_EMAIL }}
+      SYSTEM_EMAIL_ADDRESS: ${{ secrets.SYSTEM_EMAIL_ADDRESS }}
+      SYSTEM_EMAIL_APP_PASSWORD: ${{ secrets.SYSTEM_EMAIL_APP_PASSWORD }}
       DEFAULT_MODEL: "gemini-3-flash-preview"
 
     steps:
@@ -65,7 +62,7 @@ jobs:
         run: pytest backend/app/tests/ -v --tb=short
 
   # ─────────────────────────────────────────
-  # JOB 2: Deploy to Cloud Run (push to main only, after tests pass)
+  # JOB 2: Deploy to Cloud Run
   # ─────────────────────────────────────────
   deploy:
     name: Deploy to Cloud Run
@@ -77,38 +74,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Authenticate to Google Cloud (Workload Identity Federation)
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          project_id: project-0c2bab5e-90a8-4a07-ab2
-          workload_identity_provider: projects/900628274880/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-          service_account: github-actions-deploy@project-0c2bab5e-90a8-4a07-ab2.iam.gserviceaccount.com
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Deploy to Cloud Run (source-based)
+      - name: Deploy to Cloud Run
         working-directory: ./backend
         run: |
           gcloud run deploy my-hr-backend \
             --source . \
-            --region asia-south1 \
-            --project project-0c2bab5e-90a8-4a07-ab2 \
+            --region ${{ vars.GCP_REGION }} \
+            --project ${{ vars.GCP_PROJECT_ID }} \
             --allow-unauthenticated \
-            --add-cloudsql-instances="project-0c2bab5e-90a8-4a07-ab2:asia-south1:apexhr" \
+            --add-cloudsql-instances="${{ secrets.GCP_CLOUDSQL_INSTANCE }}" \
             --set-secrets="ACCESS_TOKEN_EXPIRE_MINUTES=ACCESS_TOKEN_EXPIRE_MINUTES:latest,ALGORITHM=ALGORITHM:latest,DATABASE_URL=DATABASE_URL:latest,DEFAULT_MODEL=DEFAULT_MODEL:latest,ENCRYPTION_KEY=ENCRYPTION_KEY:latest,FRONTEND_URL=FRONTEND_URL:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest,GOOGLE_API_KEY=GOOGLE_API_KEY:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,HR_DEPARTMENT_EMAIL=HR_DEPARTMENT_EMAIL:latest,PINECONE_API_KEY=PINECONE_API_KEY:latest,SECRET_KEY=SECRET_KEY:latest,SYSTEM_EMAIL_ADDRESS=SYSTEM_EMAIL_ADDRESS:latest,SYSTEM_EMAIL_APP_PASSWORD=SYSTEM_EMAIL_APP_PASSWORD:latest,GOOGLE_REDIRECT_URI=GOOGLE_REDIRECT_URI:latest"
-      - name: Update GOOGLE_REDIRECT_URI to Latest
+
+      - name: Update GOOGLE_REDIRECT_URI
         run: |
-          BACKEND_URL=$(gcloud run services describe my-hr-backend --region asia-south1 --format='value(status.url)' --quiet)
+          BACKEND_URL=$(gcloud run services describe my-hr-backend --region ${{ vars.GCP_REGION }} --format='value(status.url)' --quiet)
           FULL_CALLBACK_URL="${BACKEND_URL}/auth/google/callback"
-          gcloud secrets delete GOOGLE_REDIRECT_URI --project project-0c2bab5e-90a8-4a07-ab2 --quiet || true
-          gcloud secrets create GOOGLE_REDIRECT_URI --replication-policy="automatic" --project project-0c2bab5e-90a8-4a07-ab2
-          echo -n "$FULL_CALLBACK_URL" | gcloud secrets versions add GOOGLE_REDIRECT_URI --data-file=- --project project-0c2bab5e-90a8-4a07-ab2 --quiet
+          gcloud secrets delete GOOGLE_REDIRECT_URI --project ${{ vars.GCP_PROJECT_ID }} --quiet || true
+          gcloud secrets create GOOGLE_REDIRECT_URI --replication-policy="automatic" --project ${{ vars.GCP_PROJECT_ID }}
+          echo -n "$FULL_CALLBACK_URL" | gcloud secrets versions add GOOGLE_REDIRECT_URI --data-file=- --project ${{ vars.GCP_PROJECT_ID }} --quiet
 
       - name: Print deployed URL
         run: |
           URL=$(gcloud run services describe my-hr-backend \
-            --region asia-south1 \
-            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --region ${{ vars.GCP_REGION }} \
+            --project ${{ vars.GCP_PROJECT_ID }} \
             --format='value(status.url)')
           echo "✅ Backend deployed to: $URL"

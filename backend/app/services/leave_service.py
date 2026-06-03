@@ -11,18 +11,24 @@ from fastapi import HTTPException
 # Processes new leave applications and validates against notice and balance rules
 def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
     user = db.get(User, user_id)
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     duration = (leave_in.end_date - leave_in.start_date).days + 1
 
-    # Rule: Leaves > 3 days must be booked at least 14 days in advance
-    if duration > 3:
+    # Rule: All NON-sick leaves require 14 days advance notice
+    if leave_in.leave_type.lower() != "sick":
         notice_deadline = date.today() + timedelta(days=14)
+        if duration > 3:
+            raise HTTPException(
+                status_code=400,
+                detail="Requests less than 3 days"
+            )
         if leave_in.start_date < notice_deadline:
             raise HTTPException(
                 status_code=400,
-                detail="Requests > 3 days require 14 days advance notice."
+                detail="All non-sick leave requests require 14 days advance notice."
             )
 
     # Balance Check and Deduction
@@ -32,6 +38,7 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
                 status_code=400,
                 detail=f"Insufficient Annual Leave. Balance: {user.annual_leave_balance}"
             )
+
         user.annual_leave_balance -= duration
 
     elif leave_in.leave_type == "sick":
@@ -40,12 +47,19 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
                 status_code=400,
                 detail=f"Insufficient Sick Leave. Balance: {user.sick_leave_balance}"
             )
+
         user.sick_leave_balance -= duration
 
-    leave = Leave(**leave_in.model_dump(), user_id=user_id, status="pending")
+    leave = Leave(
+        **leave_in.model_dump(),
+        user_id=user_id,
+        status="pending"
+    )
+
     db.add(leave)
     db.commit()
     db.refresh(leave)
+
     return leave
 
 # get the leave, who log in now

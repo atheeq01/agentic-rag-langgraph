@@ -22,7 +22,7 @@ env:
 
 jobs:
   # ─────────────────────────────────────────
-  # JOB 1: Build (Using Node 24)
+  # JOB 1: Build
   # ─────────────────────────────────────────
   build:
     name: Build Frontend
@@ -35,7 +35,7 @@ jobs:
       - name: Set up Node.js 24
         uses: actions/setup-node@v6
         with:
-          node-version: "24"  # Switched from 22 to 24
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -50,7 +50,7 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
@@ -84,20 +84,20 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: projects/900628274880/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-          service_account: github-actions-deploy@project-0c2bab5e-90a8-4a07-ab2.iam.gserviceaccount.com
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Deploy to Firebase Hosting (live)
         working-directory: ./frontend
         run: |
-          npx firebase-tools deploy --only hosting --project project-0c2bab5e-90a8-4a07-ab2 --non-interactive
+          npx firebase-tools deploy --only hosting --project ${{ vars.GCP_PROJECT_ID }} --non-interactive
 
       - name: Update FRONTEND_URL to Latest
         run: |
-          FRONTEND_URL="https://project-0c2bab5e-90a8-4a07-ab2.web.app"
-          gcloud secrets delete FRONTEND_URL --project project-0c2bab5e-90a8-4a07-ab2 --quiet || true
-          gcloud secrets create FRONTEND_URL --replication-policy="automatic" --project project-0c2bab5e-90a8-4a07-ab2
-          echo -n "$FRONTEND_URL" | gcloud secrets versions add FRONTEND_URL --data-file=- --project project-0c2bab5e-90a8-4a07-ab2 --quiet
+          FRONTEND_URL="https://${{ vars.GCP_PROJECT_ID }}.web.app"
+          gcloud secrets delete FRONTEND_URL --project ${{ vars.GCP_PROJECT_ID }} --quiet || true
+          gcloud secrets create FRONTEND_URL --replication-policy="automatic" --project ${{ vars.GCP_PROJECT_ID }}
+          echo -n "$FRONTEND_URL" | gcloud secrets versions add FRONTEND_URL --data-file=- --project ${{ vars.GCP_PROJECT_ID }} --quiet
 
   # ─────────────────────────────────────────
   # JOB 2b: Deploy Preview (PR only)
@@ -121,12 +121,12 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: projects/900628274880/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-          service_account: github-actions-deploy@project-0c2bab5e-90a8-4a07-ab2.iam.gserviceaccount.com
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Deploy to Firebase Hosting (preview)
         working-directory: ./frontend
         run: |
           npx firebase-tools hosting:channel:deploy pr-${{ github.event.number }} \
-            --project project-0c2bab5e-90a8-4a07-ab2 \
+            --project ${{ vars.GCP_PROJECT_ID }} \
             --expires 7d
