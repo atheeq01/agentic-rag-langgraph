@@ -62,6 +62,13 @@ def change_password(
     if not verify_password(password_in.old_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Incorrect old password")
 
+    if verify_password(password_in.new_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Cannot reuse current password")
+
+    for history in current_user.password_history:
+        if verify_password(password_in.new_password, history.password_hash):
+            raise HTTPException(status_code=400, detail="Cannot reuse a previous password")
+
     user_service.update_user_password(db, current_user.id, password_in.new_password)
     return {"message": "Password updated successfully"}
 

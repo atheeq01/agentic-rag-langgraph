@@ -18,36 +18,30 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
     duration = (leave_in.end_date - leave_in.start_date).days + 1
 
     # Rule: All NON-sick leaves require 14 days advance notice
-    if leave_in.leave_type.lower() != "sick":
+    leave_type_lower = leave_in.leave_type.lower()
+    if leave_type_lower != "sick":
         notice_deadline = date.today() + timedelta(days=14)
-        if duration > 3:
+        if duration > 3 and leave_in.start_date < notice_deadline:
             raise HTTPException(
                 status_code=400,
-                detail="Requests less than 3 days"
-            )
-        if leave_in.start_date < notice_deadline:
-            raise HTTPException(
-                status_code=400,
-                detail="All non-sick leave requests require 14 days advance notice."
+                detail="14 days advance notice required for leaves exceeding 3 days."
             )
 
     # Balance Check and Deduction
-    if leave_in.leave_type == "annual":
+    if leave_type_lower == "annual":
         if user.annual_leave_balance < duration:
             raise HTTPException(
                 status_code=400,
                 detail=f"Insufficient Annual Leave. Balance: {user.annual_leave_balance}"
             )
-
         user.annual_leave_balance -= duration
 
-    elif leave_in.leave_type == "sick":
+    elif leave_type_lower == "sick":
         if user.sick_leave_balance < duration:
             raise HTTPException(
                 status_code=400,
                 detail=f"Insufficient Sick Leave. Balance: {user.sick_leave_balance}"
             )
-
         user.sick_leave_balance -= duration
 
     leave = Leave(

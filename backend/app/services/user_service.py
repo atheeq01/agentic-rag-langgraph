@@ -49,6 +49,9 @@ def update_user_password(db: Session, user_id, new_password: str):
     user = get_user_by_id(db, user_id)
     if not user:
         return None
+    from app.models.user import PasswordHistory
+    history_entry = PasswordHistory(user_id=user.id, password_hash=user.password_hash)
+    db.add(history_entry)
     user.password_hash = hash_password(new_password)
     db.commit()
     db.refresh(user)
