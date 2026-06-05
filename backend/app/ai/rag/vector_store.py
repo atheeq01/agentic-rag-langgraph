@@ -9,7 +9,7 @@ _index = None
 
 def _init_pinecone():
     global _vector_store, _index
-    raw_api_key = settings.pinecone_api_key
+    raw_api_key = settings.PINECONE_API_KEY
     if not raw_api_key:
         raise ValueError("PINECONE_API_KEY is missing from your environment!")
 

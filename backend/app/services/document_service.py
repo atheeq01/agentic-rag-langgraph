@@ -10,6 +10,7 @@ from google.api_core.exceptions import Conflict
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from app.core.config import settings
 from app.models.document import Document
 from app.ai.rag.vector_store import get_vector_store, get_index
 
@@ -21,7 +22,7 @@ def get_storage_client():
         _storage_client = storage.Client()
     return _storage_client
 
-BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "my-enterprise-hr-docs")
+BUCKET_NAME = settings.GCS_BUCKET_NAME
 
 def upload_and_process_document(db: Session, file: UploadFile, user_id: uuid.UUID):
     doc_id = uuid.uuid4()

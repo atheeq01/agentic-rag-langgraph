@@ -32,26 +32,29 @@ def team_leaves(status: str | None = None, db: Session = Depends(get_db),
 
 
 @router.post("/{leave_id}/action", response_model=LeaveOut)
-def action_leave(leave_id: UUID, approve: bool, db: Session = Depends(get_db),
-                 current_user: User = Depends(get_current_user)):
+def action_leave(leave_id: UUID, approve: bool, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_role(current_user.role, [ROLE_MANAGER, ROLE_HR, ROLE_ADMIN])
 
     leave = leave_service.approve_leave(db, leave_id, current_user.id, approve)
     if not leave:
-        raise HTTPException(status_code=404, detail="Leave not found")
+        raise HTTPException(status_code=404, detail="Leave tracking record not found")
 
     status_text = "Approved" if approve else "Rejected"
-    color = "#10b981" if approve else "#e11d48"
+    status_color = "#10b981" if approve else "#ef4444"  # High contrast Hex UI Colors
 
     html = TEMPLATES["LEAVE_DECISION"].format(
-        status=status_text,
-        color=color,
-        start=leave.start_date.strftime("%Y-%m-%d"),
-        end=leave.end_date.strftime("%Y-%m-%d"),
+        status=status_text.upper(),
+        color=status_color,
+        start=leave.start_date.strftime("%B %d, %Y"),
+        end=leave.end_date.strftime("%B %d, %Y"),
         manager=current_user.full_name,
-        note="Actioned via HR Management Portal"
+        note="Actioned dynamically via HR System Management Console Portal"
     )
 
-    send_system_notification(leave.user.email, f"Leave Request Update: {status_text}", html)
+    send_system_notification(
+        leave.user.email,
+        f"Leave Request Status Update: {status_text}",
+        html
+    )
 
     return leave

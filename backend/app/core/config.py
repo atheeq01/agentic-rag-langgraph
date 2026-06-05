@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,8 +15,13 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
+    GCS_BUCKET_NAME: str =
 
     ENCRYPTION_KEY: str
+
+    SYSTEM_EMAIL_ADDRESS: str
+    SYSTEM_EMAIL_APP_PASSWORD: SecretStr
+    HR_DEPARTMENT_EMAIL: str
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
 
+from app.core.config import settings
 from app.core.email_utils import TEMPLATES, send_system_notification
 from app.db.session import get_db
 from app.api.v1.deps import get_current_user
@@ -22,15 +23,25 @@ router = APIRouter(prefix="/complaints", tags=["Complaints"])
 def create(data: ComplaintCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     complaint = complaint_service.create_complaint(db, current_user.id, data)
 
-    reporter_name = "Anonymous" if data.is_anonymous else current_user.full_name
+    if data.is_anonymous:
+        reporter_name = "Anonymous Employee Submission"
+    else:
+        reporter_name = f"{current_user.full_name} (ID: {current_user.id})"
+
     html = TEMPLATES["NEW_COMPLAINT"].format(
         dept=data.department,
-        priority=data.priority,
+        priority=data.priority.upper(),
         title=data.title,
         description=data.description,
         reporter=reporter_name
     )
-    send_system_notification(os.getenv("HR_DEPARTMENT_EMAIL"), f"Grievance: {data.title}", html)
+
+    # Safe reference via centralized settings configuration object
+    send_system_notification(
+        settings.HR_DEPARTMENT_EMAIL,
+        f"Grievance Filed [Priority: {data.priority.upper()}]: {data.title}",
+        html
+    )
 
     return complaint
 

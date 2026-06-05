@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import TypedDict, Annotated, List
 import os
 import time
-from dotenv import load_dotenv
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -37,10 +36,9 @@ from app.ai.tools.hr_tools import (
     get_current_date,
 )
 
-load_dotenv()
+API_KEY = settings.GOOGLE_API_KEY
 
-API_KEY = os.getenv("GOOGLE_API_KEY")
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL")
+DEFAULT_MODEL = settings.DEFAULT_MODEL
 if not API_KEY:
     raise ValueError("GOOGLE_API_KEY not found")
 
