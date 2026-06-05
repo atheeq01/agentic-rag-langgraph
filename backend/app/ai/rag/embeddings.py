@@ -7,4 +7,7 @@ if not google_api_key:
     raise ValueError("GOOGLE_API_KEY is missing from environment variables.")
 
 
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/gemini-embedding-001",
+    api_key=google_api_key
+)

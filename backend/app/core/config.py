@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
-    GCS_BUCKET_NAME: str =
+    GCS_BUCKET_NAME: str = "my-enterprise-hr-docs"
 
     ENCRYPTION_KEY: str
 

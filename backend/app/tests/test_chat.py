@@ -1,5 +1,6 @@
 import pytest
 from uuid import UUID
+from unittest.mock import AsyncMock, patch
 
 def create_user(client, email):
     return client.post("/auth/register", json={
@@ -116,12 +117,17 @@ def test_message_feedback(client):
     token = get_token(client, "user8@test.com")
     session = client.post("/ai/sessions", headers=auth_header(token)).json()
 
-    msg_res = client.post(
-        "/ai/messages",
-        json={"session_id": session["id"], "role": "user", "content": "Hello AI"},
-        headers=auth_header(token)
-    )
+    with patch("app.api.v1.endpoints.ai_chat.run_chat", new_callable=AsyncMock) as mock_run_chat:
+        mock_run_chat.return_value = "Mocked AI Response"
+
+        msg_res = client.post(
+            "/ai/messages",
+            json={"session_id": session["id"], "role": "user", "content": "Hello AI"},
+            headers=auth_header(token)
+        )
+
     message_id = msg_res.json()["id"]
+
 
     res = client.post(
         f"/ai/messages/{message_id}/feedback",
