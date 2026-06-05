@@ -10,8 +10,22 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
+import langgraph.checkpoint.postgres.aio
+from langgraph.checkpoint.memory import MemorySaver
+import psycopg_pool
+
+class MockAsyncPostgresSaver(MemorySaver):
+    async def setup(self):
+        pass
+
+class MockPool:
+    async def open(self): pass
+    def __init__(self, *args, **kwargs): pass
+
+langgraph.checkpoint.postgres.aio.AsyncPostgresSaver = lambda pool: MockAsyncPostgresSaver()
+psycopg_pool.AsyncConnectionPool = MockPool
+
 # 2. CREATE THE SQLITE TEST ENGINE FOR DB
-# We keep the database local so we don't wipe your real Postgres DB!
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 test_engine = create_engine(
