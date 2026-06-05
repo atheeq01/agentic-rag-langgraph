@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-type Message = { id: string; role: 'user' | 'agent'; content: string; timestamp: string; citations?: string[]; authUrl?: string };
+type Message = { id: string; role: 'user' | 'agent'; content: string; timestamp: string; citations?: string[]; authUrl?: string; requiresGoogleAuth?: boolean };
 
 const WELCOME_MSG: Message = {
   id: 'welcome',
@@ -42,6 +42,40 @@ export default function AIChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, loadingHistory]);
+
+  const handleGoogleConnect = async () => {
+    try {
+      const response = await api.get('/auth/google/login');
+      const authUrl = response.data.auth_url;
+      
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      window.open(
+        authUrl, 
+        "Google OAuth", 
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+    } catch (error) {
+      console.error("Error initiating Google OAuth:", error);
+    }
+  };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "GOOGLE_AUTH_SUCCESS") {
+        console.log("Gmail connected successfully!");
+        if (lastUserMessageRef.current) {
+          chatMutation.mutate(lastUserMessageRef.current);
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   // Fetch all sessions for sidebar
   const { data: sessions, isLoading: loadingSessions } = useQuery({
@@ -113,51 +147,15 @@ export default function AIChatPage() {
       const aiContent = data.content || "I have processed your request.";
       
       if (aiContent.includes("GOOGLE_AUTH_REQUIRED")) {
-        try {
-          const authRes = await api.get('/auth/google/login');
-          const authUrl = authRes.data.auth_url;
-          setPendingAuthUrl(authUrl);
-
-          // Attempt to open popup
-          const popup = window.open(authUrl, "google-auth", "width=500,height=600");
-          const popupBlocked = !popup || popup.closed || typeof popup.closed === 'undefined';
-
-          const handleMessage = (event: MessageEvent) => {
-            if (event.data?.type === "GOOGLE_AUTH_SUCCESS") {
-                window.removeEventListener("message", handleMessage);
-                popup?.close();
-                setPendingAuthUrl(null);
-                if (lastUserMessageRef.current) {
-                    chatMutation.mutate(lastUserMessageRef.current);
-                }
-            }
-          };
-
-          window.addEventListener("message", handleMessage);
-
-          const pollClosed = setInterval(() => {
-            if (popup?.closed) {
-                clearInterval(pollClosed);
-                window.removeEventListener("message", handleMessage);
-            }
-          }, 500);
-
-          const msgContent = popupBlocked
-            ? "To book your leave, I need access to your Google account. Your browser blocked the popup — please click the button below to connect your Google account."
-            : "I have opened a secure popup for you to connect your Google account. Please complete the authorization there, and I will automatically retry your request!";
-
-          setMessages(prev => [...prev, {
-            id: data.id || Date.now().toString(),
-            role: 'agent',
-            content: msgContent,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            citations: data.citations || [],
-            authUrl
-          }]);
-          return;
-        } catch (error) {
-          console.error("Failed to handle Google login redirect", error);
-        }
+        setMessages(prev => [...prev, {
+          id: data.id || Date.now().toString(),
+          role: 'agent',
+          content: "To proceed, I need secure access to your Google account. Please click the button below to connect your Gmail account. Once connected, your request will automatically resume.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          citations: data.citations || [],
+          requiresGoogleAuth: true
+        }]);
+        return;
       }
 
       setMessages(prev => [...prev, {
@@ -389,31 +387,10 @@ export default function AIChatPage() {
                     <p className="text-sm md:text-base leading-relaxed font-medium whitespace-pre-wrap">{msg.content}</p>
 
                     {/* Google Auth Connect Button */}
-                    {msg.authUrl && (
+                    {(msg.authUrl || msg.requiresGoogleAuth) && (
                       <div className="mt-4 pt-4 border-t border-slate-100">
-                        <a
-                          href={msg.authUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => {
-                            // Also try opening as popup on click
-                            const popup = window.open(msg.authUrl, "google-auth", "width=500,height=600");
-                            if (popup) {
-                              const handleMessage = (event: MessageEvent) => {
-                                if (event.data?.type === "GOOGLE_AUTH_SUCCESS") {
-                                  window.removeEventListener("message", handleMessage);
-                                  popup.close();
-                                  setPendingAuthUrl(null);
-                                  if (lastUserMessageRef.current) {
-                                    chatMutation.mutate(lastUserMessageRef.current);
-                                  }
-                                }
-                              };
-                              window.addEventListener("message", handleMessage);
-                              // prevent default navigation since we opened popup
-                              return false;
-                            }
-                          }}
+                        <button
+                          onClick={handleGoogleConnect}
                           className="inline-flex items-center gap-2.5 mt-1 px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
                         >
                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -424,8 +401,8 @@ export default function AIChatPage() {
                           </svg>
                           Connect with Google
                           <ExternalLink className="w-3 h-3 opacity-70" />
-                        </a>
-                        <p className="text-[10px] text-slate-400 font-semibold mt-2 italic">Click above to connect your Google account, then your request will be retried automatically.</p>
+                        </button>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-2 italic">Click above to connect your Google account.</p>
                       </div>
                     )}
 

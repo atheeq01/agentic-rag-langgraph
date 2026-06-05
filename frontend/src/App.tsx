@@ -12,6 +12,7 @@ import AIChatPage from '@/pages/AIChatPage';
 import SettingsPage from '@/pages/SettingsPage';
 import PrivacyPolicy from '@/pages/PrivacyPolicy'; // New Import
 import TermsOfService from '@/pages/TermsOfService'; // New Import
+import LandingPage from '@/pages/LandingPage';
 import { useAuthStore, type UserRole } from '@/store/useStore';
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
 
@@ -62,7 +64,6 @@ export default function App() {
             <Route path="/ai-chat" element={<AIChatPage />} />
             <Route path="/settings" element={<SettingsPage />} />
 
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Routes>
