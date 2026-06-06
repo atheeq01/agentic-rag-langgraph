@@ -28,7 +28,7 @@ export default function ManageLeavesPage() {
     mutationFn: ({ id, approve }: { id: string; approve: boolean }) =>
       api.post(`/leaves/${id}/action?approve=${approve}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leaves', 'team'] });
+      void queryClient.invalidateQueries({ queryKey: ['leaves', 'team'] });
     }
   });
 

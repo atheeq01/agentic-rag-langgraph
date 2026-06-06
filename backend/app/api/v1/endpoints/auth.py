@@ -1,20 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from app.schemas.auth import UserCreate, UserLogin, Token, UserUpdatePassword
+from app.schemas.auth import UserCreate, UserLogin, UserUpdatePassword
 from app.db.session import get_db
 from app.services import auth_service
-from app.models.user import User
+from app.models.user import User, TokenBlacklist
 from app.api.v1.deps import get_current_user
-
+from app.core.security import decode_access_token
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # create a new user from the register page
 @router.post("/register", response_model=dict)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+def register(user_in: UserCreate, response: Response, db: Session = Depends(get_db)):
     stmt = select(User).where(User.email == user_in.email)
     existing = db.scalar(stmt)
 
@@ -23,17 +24,33 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
     user = auth_service.create_user(db, email=user_in.email, password=user_in.password, full_name=user_in.full_name)
     token = auth_service.create_user_token(user)
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {token}",
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=3600
+    )
     return {"access_token": token, "token_type": "bearer"}
 
 # login page authentication with login-form
 @router.post("/login-form", response_model=dict)
-def login(credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(response: Response, credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user, error_msg, needs_reset = auth_service.authenticate_user(db, credentials.username, credentials.password)
 
     if not user:
         raise HTTPException(status_code=401, detail=error_msg)
 
     token = auth_service.create_user_token(user)
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {token}",
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=3600
+    )
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -42,17 +59,43 @@ def login(credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depe
 
 # create the login page with JSON format
 @router.post("/login", response_model=dict)
-def login_json(credentials: UserLogin, db: Session = Depends(get_db)):
+def login_json(credentials: UserLogin, response: Response, db: Session = Depends(get_db)):
     user, error_msg, needs_reset = auth_service.authenticate_user(db, credentials.email, credentials.password)
 
     if not user:
         raise HTTPException(status_code=401, detail=error_msg)
 
+    token = auth_service.create_user_token(user)
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {token}",
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=3600
+    )
     return {
-        "access_token": auth_service.create_user_token(user),
+        "access_token": token,
         "token_type": "bearer",
         "needs_password_reset": needs_reset
     }
+
+@router.post("/logout", response_model=dict)
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    token = request.cookies.get("access_token")
+    if token:
+        if token.startswith("Bearer "):
+            token = token.split(" ")[1]
+            
+        payload = decode_access_token(token)
+        if payload and "exp" in payload:
+            exp_time = datetime.fromtimestamp(payload["exp"], timezone.utc)
+            blacklist_entry = TokenBlacklist(token=token, expires_at=exp_time)
+            db.add(blacklist_entry)
+            db.commit()
+
+    response.delete_cookie("access_token")
+    return {"message": "Logged out successfully"}
 
 # change password after login
 @router.post("/change-password")

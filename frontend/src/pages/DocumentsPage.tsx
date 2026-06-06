@@ -33,7 +33,7 @@ export default function DocumentsPage() {
       headers: { 'Content-Type': 'multipart/form-data' }
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      void queryClient.invalidateQueries({ queryKey: ['documents'] });
       setErrorMsg('');
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
@@ -46,7 +46,7 @@ export default function DocumentsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/documents/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      void queryClient.invalidateQueries({ queryKey: ['documents'] });
     }
   });
 

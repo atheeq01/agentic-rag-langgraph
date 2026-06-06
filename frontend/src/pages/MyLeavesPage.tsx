@@ -50,7 +50,7 @@ export default function MyLeavesPage() {
       reason: data.reason
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leaves', 'me'] });
+      void queryClient.invalidateQueries({ queryKey: ['leaves', 'me'] });
       setActiveTab('history');
       setFormData({ start_date: '', end_date: '', leave_type: 'Annual', reason: '' });
       setErrorMsg('');

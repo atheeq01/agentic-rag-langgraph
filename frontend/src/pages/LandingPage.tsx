@@ -60,7 +60,7 @@ export default function LandingPage() {
               className="inline-flex items-center justify-center text-white text-lg px-8 py-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-blue-600 hover:bg-blue-700 font-semibold"
               onClick={() => navigate('/login')}
             >
-              Log In with Google <ArrowRight className="ml-2 w-5 h-5" />
+              Log In | Sign up <ArrowRight className="ml-2 w-5 h-5" />
             </button>
           </motion.div>
         </section>

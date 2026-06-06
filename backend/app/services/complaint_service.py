@@ -37,7 +37,7 @@ def get_my_complaints(db:Session,user_id:UUID):
 # retrieve all complaints filed anonymously
 def get_anonymous_complaints(db:Session):
     stmt = (select(Complaint).where(
-        Complaint.is_anonymous == True
+        Complaint.is_anonymous.is_(True)
     ).order_by(Complaint.id.desc()))
     return db.scalars(stmt).all()
 
@@ -47,7 +47,7 @@ def get_complaint_by_id(db:Session,complaint_id:UUID):
     return db.scalar(stmt)
 
 # update the status or resolution notes of a complaint
-def update_complaint(db: Session, complaint_id: UUID, data: ComplaintUpdate, resolved_by_id: UUID = None):
+def update_complaint(db: Session, complaint_id: UUID, data: ComplaintUpdate, resolved_by_id: UUID | None = None):
     stmt = select(Complaint).where(Complaint.id == complaint_id)
     complaint = db.scalar(stmt)
 

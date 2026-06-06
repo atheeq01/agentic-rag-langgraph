@@ -1,298 +1,278 @@
-from datetime import datetime
-from typing import TypedDict, Annotated, List
-import os
+import asyncio
 import time
-
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from psycopg_pool import AsyncConnectionPool
-from psycopg_pool import ConnectionPool
-from langgraph.graph.message import add_messages
+from datetime import datetime
+from typing import Annotated, List, TypedDict
 
 from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
     HumanMessage,
     SystemMessage,
-    BaseMessage,
     ToolMessage,
 )
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from psycopg_pool import AsyncConnectionPool
 
 from app.ai.prompts import (
-    LEAVE_PROMPT,
+    COMMON_AGENT_PROMPT,
     COMPLAINT_PROMPT,
     HR_PROMPT,
-    COMMON_AGENT_PROMPT,
+    LEAVE_PROMPT,
 )
 from app.ai.router.hybrid_router import semantic_router
+from app.ai.tools.hr_tools import make_tools_for_user
 from app.core.config import settings
 
-from app.ai.tools.hr_tools import (
-    check_sql_leave_balance,
-    hr_vector_search,
-    draft_and_send_email,
-    current_user_var,
-    apply_leave_tool,
-    submit_formal_complaint,
-    get_current_date,
-)
 
+
+# LLM
 API_KEY = settings.GOOGLE_API_KEY
-
 DEFAULT_MODEL = settings.DEFAULT_MODEL
+
 if not API_KEY:
     raise ValueError("GOOGLE_API_KEY not found")
 
-llm = ChatGoogleGenerativeAI(
+_base_llm = ChatGoogleGenerativeAI(
     model=DEFAULT_MODEL,
     temperature=0.2,
     timeout=30,
 )
 
-connection_kwargs = {
-    "autocommit": True,
-    "prepare_threshold": 0,
-}
 
-pool = AsyncConnectionPool(
-    conninfo=settings.DATABASE_URL, kwargs=connection_kwargs, max_size=20, open=False
+# Async PG connection pool  (singleton)
+_pool = AsyncConnectionPool(
+    conninfo=settings.DATABASE_URL,
+    kwargs={"autocommit": True, "prepare_threshold": 0},
+    max_size=20,
+    open=False,  # opened in startup()
 )
 
-_check_pointer = None
-_graph = None
-
-def get_checkpointer():
-    global _check_pointer
-    if _check_pointer is None:
-        _check_pointer = AsyncPostgresSaver(pool)
-    return _check_pointer
-
-def get_graph():
-    global _graph
-    if _graph is None:
-        _graph = builder.compile(checkpointer=get_checkpointer())
-    return _graph
+_checkpointer: AsyncPostgresSaver | None = None
+def _get_checkpointer() -> AsyncPostgresSaver:
+    global _checkpointer
+    if _checkpointer is None:
+        _checkpointer = AsyncPostgresSaver(_pool)
+    return _checkpointer
 
 
-# ──────────────── STATE ────────────────
+# Startup  (call once from FastAPI lifespan)
+async def startup():
+    """
+    Open the connection pool and run Langgraph checkpointer migrations.
+    Call this from your FastAPI @asynccontextmanager lifespan, NOT lazily
+    inside run_chat, to avoid per-request races.
+    """
+    await _pool.open()
+    await _get_checkpointer().setup()
+    print("[Graph] DB pool and checkpointer ready.")
+
+
+async def shutdown():
+    await _pool.close()
+    print("[Graph] DB pool closed.")
+
+
+
+
+
+
+# State
 class State(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
     user_context: dict
 
 
 def get_system_context(state: State, base_prompt: str) -> str:
-    user_context = state.get("user_context", {})
-    today_date = datetime.now().strftime("%Y-%m-%d")
+    ctx = state.get("user_context", {})
+    today = datetime.now().strftime("%Y-%m-%d")
     return (
         f"{base_prompt}\n\n"
         f"SYSTEM CONTEXT (DO NOT ASK USER)\n"
-        f"Employee ID: {user_context.get('employee_id')}\n"
-        f"Employee Name: {user_context.get('employee_name')}\n"
-        f"Today Date: {today_date}\n"
+        f"Employee ID: {ctx.get('employee_id')}\n"
+        f"Employee Name: {ctx.get('employee_name')}\n"
+        f"Today Date: {today}\n"
         f"RULES:\n"
         f"- NEVER ask for Employee ID or Name.\n"
         f"- ALWAYS use this data in your tools."
     )
 
 
+# extract_text  –  safely pull text from the final message
 def extract_text(content) -> str:
     if isinstance(content, list):
         return " ".join(
-            [
-                str(item.get("text", ""))
-                for item in content
-                if isinstance(item, dict) and "text" in item
-            ]
+            str(item.get("text", ""))
+            for item in content
+            if isinstance(item, dict) and "text" in item
         )
     return str(content) if content else ""
 
 
-# ──────────────── TOOL-BOUND LLMs ────────────────
-leave_llm = llm.bind_tools(
-    [check_sql_leave_balance, apply_leave_tool, draft_and_send_email, get_current_date]
-)
-complaint_llm = llm.bind_tools([submit_formal_complaint, check_sql_leave_balance])
-hr_llm = llm.bind_tools([hr_vector_search, draft_and_send_email])
-common_llm = llm.bind_tools(
-    [check_sql_leave_balance, draft_and_send_email, get_current_date]
-)
+def _safe_final_text(messages: List[BaseMessage]) -> str:
+    """
+    Walk backwards through messages to find the last AIMessage.
+    Prevents raw ToolMessage output being returned to the user when the
+    agent loop exits unexpectedly mid-tool-call.
+    """
+    for msg in reversed(messages):
+        if isinstance(msg, AIMessage):
+            return extract_text(msg.content)
+    # Ultimate fallback
+    return extract_text(messages[-1].content) if messages else ""
 
 
-# ──────────────── TOOL EXECUTOR ────────────────
-def execute_tools(response, tool_map):
-    """Execute tool calls from LLM response and return ToolMessages."""
-    tool_messages = []
-    requires_google_auth = False
-    if not hasattr(response, "tool_calls") or not response.tool_calls:
-        return tool_messages, requires_google_auth
 
-    for tc in response.tool_calls:
-        tool_name = tc["name"]
-        tool = tool_map.get(tool_name)
-        if tool is None:
-            tool_messages.append(
-                ToolMessage(
-                    content=f"Error: Tool {tool_name} not found.", tool_call_id=tc["id"]
-                )
-            )
-            continue
+# LLM call with retry
+async def _invoke_with_retry(bound_llm, messages, max_retries: int = 3):
+    """
+    Retry the LLM call on transient errors (rate limits, timeouts, 5xx).
+    Uses simple exponential back-off: 1s, 2s, 4s.
+    """
+    last_exc = None
+    for attempt in range(max_retries):
         try:
-            result = tool.invoke(tc["args"])
-            result_str = str(result)
-            if "GOOGLE_AUTH_REQUIRED" in result_str:
-                requires_google_auth = True
-            tool_messages.append(ToolMessage(content=result_str, tool_call_id=tc["id"]))
-        except Exception as e:
-            tool_messages.append(
-                ToolMessage(content=f"Error: {str(e)}", tool_call_id=tc["id"])
-            )
-
-    return tool_messages, requires_google_auth
+            return await bound_llm.ainvoke(messages)
+        except Exception as exc:
+            last_exc = exc
+            wait = 2 ** attempt
+            print(f"  [LLM] Attempt {attempt + 1} failed ({exc}). Retrying in {wait}s…")
+            await asyncio.sleep(wait)
+    raise last_exc
 
 
-# ──────────────── AGENT RUNNER (handles tool loop internally) ────────────────
+# Core agent loop  (shared by all agent nodes)
 async def _run_agent_loop(
-    state: State, bound_llm, base_prompt: str, tool_map: dict, max_iterations: int = 6
+        state: State,
+        bound_llm,
+        base_prompt: str,
+        tool_map: dict,
+        max_iterations: int = 6,
 ):
     """
-    Runs a single agent with an internal tool-calling loop.
-    Instead of bouncing back through the graph for each tool call (slow),
-    we loop inside this function until the LLM produces a final text response.
+    Run a single agent with an internal tool-calling loop.
+    Loops until the LLM produces a final text response (no tool_calls)
+    or until max_iterations is reached.
     """
     sys_prompt = get_system_context(state, base_prompt)
     messages = [SystemMessage(content=sys_prompt)] + list(state["messages"])
-
-    all_new_messages = []
+    all_new_messages: List[BaseMessage] = []
 
     for i in range(max_iterations):
         t0 = time.time()
-        response = await bound_llm.ainvoke(messages)
-        elapsed = time.time() - t0
-        print(f"  [Agent] LLM call #{i + 1} took {elapsed:.2f}s")
+        response = await _invoke_with_retry(bound_llm, messages)
+        print(f"  [Agent] LLM call #{i + 1} took {time.time() - t0:.2f}s")
 
         all_new_messages.append(response)
 
-        # If LLM didn't call any tools, we're done
+        # No tool calls → final answer
         if not getattr(response, "tool_calls", None):
             break
 
-        # Execute tools and feed results back
-        tool_msgs, requires_google_auth = execute_tools(response, tool_map)
-        all_new_messages.extend(tool_msgs)
+        # Execute tools
+        tool_messages: List[ToolMessage] = []
+        requires_google_auth = False
 
-        # If a tool requires Google auth, short-circuit immediately.
-        # Return the keyword verbatim so the frontend can detect it.
+        for tc in response.tool_calls:
+            tool_fn = tool_map.get(tc["name"])
+            if tool_fn is None:
+                tool_messages.append(
+                    ToolMessage(
+                        content=f"Error: Tool '{tc['name']}' not found.",
+                        tool_call_id=tc["id"],
+                    )
+                )
+                continue
+            try:
+                assert tool_fn is not None
+                result = str(tool_fn.invoke(tc["args"]))
+                if "GOOGLE_AUTH_REQUIRED" in result:
+                    requires_google_auth = True
+                tool_messages.append(
+                    ToolMessage(content=result, tool_call_id=tc["id"])
+                )
+            except Exception as exc:
+                tool_messages.append(
+                    ToolMessage(content=f"Error: {exc}", tool_call_id=tc["id"])
+                )
+
+        all_new_messages.extend(tool_messages)
+
         if requires_google_auth:
-            print("  [Agent] GOOGLE_AUTH_REQUIRED detected — short-circuiting loop.")
-            from langchain_core.messages import AIMessage
-
+            print("  [Agent] GOOGLE_AUTH_REQUIRED — short-circuiting loop.")
             all_new_messages.append(AIMessage(content="GOOGLE_AUTH_REQUIRED"))
             break
 
-        # Extend the message list so the next LLM call has full context
         messages.append(response)
-        messages.extend(tool_msgs)
+        messages.extend(tool_messages)
 
     return {"messages": all_new_messages}
 
 
-# ──────────────── AGENT NODES ────────────────
 
+_graph_cache = {}
+MAX_CACHE_SIZE = 100
 
-async def run_common_agent(state: State):
-    print("[Common Agent] Handling general utility task...")
-    return await _run_agent_loop(
-        state,
-        common_llm,
-        COMMON_AGENT_PROMPT,
-        tool_map={
-            "check_sql_leave_balance": check_sql_leave_balance,
-            "draft_and_send_email": draft_and_send_email,
-            "get_current_date": get_current_date,
-        },
-    )
+# Public entry point
+async def run_chat(user_input: str, user, session_id: str) -> str:
+    """
+    Execute the agentic graph for a user message.
 
+    `user` is a fully-loaded ORM User object.  Tools are created as closures
+    scoped to this specific user object, so concurrent calls never share state.
+    """
+    # Build per-request tool closures
+    tool_map = make_tools_for_user(user)
 
-# ──────────────── AGENT NODES ────────────────
-async def run_leave_agent(state: State):
-    print("[Leave Agent] Starting...")
-    return await _run_agent_loop(
-        state,
-        leave_llm,
-        LEAVE_PROMPT,
-        tool_map={
-            "check_sql_leave_balance": check_sql_leave_balance,
-            "apply_leave_tool": apply_leave_tool,
-            "draft_and_send_email": draft_and_send_email,
-            "get_current_date": get_current_date,
-        },
-    )
+    # Create node closures that capture tool_map without putting it in State
+    async def _leave_agent(state: State):
+        tm = tool_map["leave"]
+        bound = _base_llm.bind_tools(list(tm.values()))
+        return await _run_agent_loop(state, bound, LEAVE_PROMPT, tm)
 
+    async def _complaint_agent(state: State):
+        tm = tool_map["complaint"]
+        bound = _base_llm.bind_tools(list(tm.values()))
+        return await _run_agent_loop(state, bound, COMPLAINT_PROMPT, tm)
 
-async def run_complaint_agent(state: State):
-    print("[Complaint Agent] Starting...")
-    return await _run_agent_loop(
-        state,
-        complaint_llm,
-        COMPLAINT_PROMPT,
-        tool_map={
-            "submit_formal_complaint": submit_formal_complaint,
-            "check_sql_leave_balance": check_sql_leave_balance,
-        },
-    )
+    async def _hr_agent(state: State):
+        tm = tool_map["hr"]
+        bound = _base_llm.bind_tools(list(tm.values()))
+        return await _run_agent_loop(state, bound, HR_PROMPT, tm)
 
+    async def _common_agent(state: State):
+        tm = tool_map["common"]
+        bound = _base_llm.bind_tools(list(tm.values()))
+        return await _run_agent_loop(state, bound, COMMON_AGENT_PROMPT, tm)
 
-async def run_hr_agent(state: State):
-    print("[HR Agent] Starting...")
-    return await _run_agent_loop(
-        state,
-        hr_llm,
-        HR_PROMPT,
-        tool_map={
-            "hr_vector_search": hr_vector_search,
-            "draft_and_send_email": draft_and_send_email,
-        },
-    )
+    sid = str(session_id)
+    if sid not in _graph_cache:
+        if len(_graph_cache) >= MAX_CACHE_SIZE:
+            _graph_cache.pop(next(iter(_graph_cache)))
+            
+        # Compile a fresh graph for this session
+        builder = StateGraph(State)
+        builder.add_node("router", semantic_router)
+        builder.add_node("leave_agent", _leave_agent)
+        builder.add_node("complaint_agent", _complaint_agent)
+        builder.add_node("hr_agent", _hr_agent)
+        builder.add_node("common_agent", _common_agent)
+        builder.add_edge(START, "router")
+        builder.add_edge("leave_agent", END)
+        builder.add_edge("complaint_agent", END)
+        builder.add_edge("hr_agent", END)
+        builder.add_edge("common_agent", END)
+        
+        _graph_cache[sid] = builder.compile(checkpointer=_get_checkpointer())
+        
+    graph = _graph_cache[sid]
 
-
-# ──────────────── BUILD GRAPH ────────────────
-builder = StateGraph(State)
-
-builder.add_node("router", semantic_router)
-builder.add_node("common_agent", run_common_agent)
-builder.add_node("leave_agent", run_leave_agent)
-builder.add_node("complaint_agent", run_complaint_agent)
-builder.add_node("hr_agent", run_hr_agent)
-
-builder.add_edge(START, "router")
-
-builder.add_edge("common_agent", END)
-builder.add_edge("leave_agent", END)
-builder.add_edge("complaint_agent", END)
-builder.add_edge("hr_agent", END)
-
-# graph = builder.compile(checkpointer=check_pointer)  <-- Now lazy loaded via get_graph()
-
-
-# ──────────────── RUN CHAT ────────────────
-_db_setup_completed = False
-
-
-async def run_chat(user_input: str, user, session_id: str):
-    """Execute the agentic RAG graph for a user message."""
-    global _db_setup_completed
-
-    if not _db_setup_completed:
-        await pool.open()
-        await get_checkpointer().setup()
-        _db_setup_completed = True
-
-    current_user_var.set(user)
-
-    config = {"configurable": {"thread_id": str(session_id)}}
-
+    config = {"configurable": {"thread_id": sid}}
     t_start = time.time()
 
-    result = await get_graph().ainvoke(
+    result = await graph.ainvoke(
         {
             "messages": [HumanMessage(content=user_input)],
             "user_context": {
@@ -303,8 +283,5 @@ async def run_chat(user_input: str, user, session_id: str):
         config=config,
     )
 
-    elapsed = time.time() - t_start
-    print(f"[run_chat] Total time: {elapsed:.2f}s")
-
-    final_msg = result["messages"][-1]
-    return extract_text(final_msg.content)
+    print(f"[run_chat] Total time: {time.time() - t_start:.2f}s")
+    return _safe_final_text(result["messages"])

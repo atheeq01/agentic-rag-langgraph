@@ -25,18 +25,20 @@ def update_user_assignment(db: Session, user_id: UUID, manager_id: UUID | None, 
     user = get_user_by_id(db, user_id)
     if not user:
         return None
-    if manager_id is not None: user.manager_id = manager_id
-    if department is not None: user.department = department
+    if manager_id is not None:
+        user.manager_id = manager_id
+    if department is not None:
+        user.department = department
     db.commit()
     db.refresh(user)
     return user
 
 # get user by ID
-def get_user_by_id(db: Session, user_id):
+def get_user_by_id(db: Session, user_id: UUID) -> User | None:
     return db.get(User, user_id)
 
 # delete the user (only admin)
-def delete_user(db: Session, user_id):
+def delete_user(db: Session, user_id: UUID) -> bool:
     user = get_user_by_id(db, user_id)
     if not user:
         return False
@@ -45,7 +47,7 @@ def delete_user(db: Session, user_id):
     return True
 
 # update user password
-def update_user_password(db: Session, user_id, new_password: str):
+def update_user_password(db: Session, user_id: UUID, new_password: str) -> User | None:
     user = get_user_by_id(db, user_id)
     if not user:
         return None
@@ -58,7 +60,7 @@ def update_user_password(db: Session, user_id, new_password: str):
     return user
 
 # update the user role (only admin)
-def update_user_role(db: Session, user_id, role: str):
+def update_user_role(db: Session, user_id: UUID, role: str) -> User | None:
     user = get_user_by_id(db, user_id)
     if not user:
         return None
@@ -68,7 +70,7 @@ def update_user_role(db: Session, user_id, role: str):
     return user
 
 # update user active status (only admin)
-def update_user_status(db: Session, user_id: UUID, is_active: bool):
+def update_user_status(db: Session, user_id: UUID, is_active: bool) -> User | None:
     user = get_user_by_id(db, user_id)
     if not user:
         return None

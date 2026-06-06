@@ -1,4 +1,3 @@
-import pytest
 from uuid import UUID
 from unittest.mock import AsyncMock, patch
 
@@ -78,24 +77,20 @@ def test_get_messages_unauthorized(client):
 
 def test_send_message_success(client):
     token = get_token(client, "user6@test.com")
-
     session = client.post("/ai/sessions", headers=auth_header(token)).json()
 
-    res = client.post(
-        "/ai/messages",
-        json={
-            "session_id": session["id"],
-            "role": "user",
-            "content": "Hello AI"
-        },
-        headers=auth_header(token)
-    )
+    with patch("app.api.v1.endpoints.ai_chat.run_chat", new_callable=AsyncMock) as mock_run:
+        mock_run.return_value = "Hello! How can I help you today?"
+
+        res = client.post(
+            "/ai/messages",
+            json={"session_id": session["id"], "role": "user", "content": "Hello AI"},
+            headers=auth_header(token)
+        )
 
     assert res.status_code == 200
-    data = res.json()
-
-    assert data["role"] == "assistant"
-    assert "content" in data
+    assert res.json()["role"] == "assistant"
+    assert "content" in res.json()
 
 def test_send_message_malicious_blocked(client):
     token = get_token(client, "user7@test.com")

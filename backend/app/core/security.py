@@ -38,14 +38,14 @@ def decode_access_token(token: str):
     except JWTError:
         return None
 
-def encrypt_token(token: str) -> str:
+def encrypt_token(token: str) -> str | None:
     """Encrypts a plaintext token for secure database storage."""
     if not token:
         return None
     encrypted_bytes = cipher_suite.encrypt(token.encode('utf-8'))
     return encrypted_bytes.decode('utf-8')
 
-def decrypt_token(encrypted_token: str) -> str:
+def decrypt_token(encrypted_token: str) -> str | None:
     """Decrypts a stored token for API usage."""
     if not encrypted_token:
         return None

@@ -1,46 +1,53 @@
 import traceback
+
 from app.ai.rag.vector_store import get_vector_store
 
 
 def retrieve_docs(query: str, user_role: str, k: int = 3) -> str:
     """
-    Searches the Pinecone vector database for relevant HR policy documents.
+    Search the Pinecone vector database for relevant HR policy documents.
 
     Args:
-        query (str): The semantic search query from the agent.
-        k (int): The number of documents to retrieve.
+        query:     The semantic search query from the agent.
+        user_role: The role of the requesting user.  Used to filter docs
+                   so employees only see documents they are allowed to view.
+        k:         Number of documents to retrieve (default 3).
 
     Returns:
-        str: A formatted string of the retrieved document chunks.
-        :param k:
-        :param query:
-        :param user_role:
+        A formatted string of retrieved document chunks, or an error message.
     """
     try:
         print(f"[Retriever] Searching for: '{query}' (k={k}, role={user_role})")
 
-        search_kwargs = {"k": k}
-        if user_role not in ["admin", "hr"]:
-            search_kwargs["filter"] = {"allowed_roles": {"$in": [user_role, "all"]}}
+        # Build kwargs dict – this is now actually passed to the search call.
+        search_kwargs: dict = {"k": k}
 
-        # Perform similarity search using the vector store
-        docs = get_vector_store().similarity_search(query, k=k)
+        # Admins and HR see everything; everyone else is filtered.
+        if user_role not in ("admin", "hr"):
+            search_kwargs["filter"] = {
+                "allowed_roles": {"$in": [user_role, "all"]}
+            }
+        
+        docs = get_vector_store().similarity_search(
+            query, **search_kwargs
+        )
 
         if not docs:
             print("[Retriever] No documents found.")
             return "No relevant HR policies found for your query."
 
-        # Format the retrieved documents into a single string for the LLM
-        formatted_results = "\n\n".join([
+        formatted = "\n\n".join(
             f"--- Document Chunk {i + 1} ---\n{doc.page_content}"
             for i, doc in enumerate(docs)
-        ])
+        )
 
         print(f"[Retriever] Found {len(docs)} document(s).")
-        return formatted_results
+        return formatted
 
     except Exception as e:
-        # Print the FULL traceback so we can debug
         print(f"[Retriever Error] Failed to retrieve docs: {e}")
         traceback.print_exc()
-        return f"Error searching HR knowledge base: {str(e)}. Please try rephrasing your question."
+        return (
+            f"Error searching HR knowledge base: {str(e)}. "
+            "Please try rephrasing your question."
+        )

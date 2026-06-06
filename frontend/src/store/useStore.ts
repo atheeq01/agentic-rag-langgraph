@@ -30,7 +30,15 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isHydrated: false,
       login: (token, user) => set({ isAuthenticated: true, token, user }),
-      logout: () => {
+      logout: async () => {
+        try {
+          await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+        } catch (e) {
+          console.error("Logout failed", e);
+        }
         set({ isAuthenticated: false, token: null, user: null });
       },
       setHydrated: (v) => set({ isHydrated: v }),
@@ -39,7 +47,6 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
-        token: state.token,
         user: state.user,
       }),
     }

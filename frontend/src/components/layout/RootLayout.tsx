@@ -43,7 +43,7 @@ export default function RootLayout() {
         setHydrated(true);
       }
     };
-    validate();
+    void validate();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show loading spinner while validating token

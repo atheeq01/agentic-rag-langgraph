@@ -61,7 +61,7 @@ def upload_and_process_document(db: Session, file: UploadFile, user_id: uuid.UUI
 
         get_vector_store().add_documents(chunks)
 
-        new_doc = Document(id=doc_id, filename=file.filename, gcs_uri=gcs_uri, uploaded_by=user_id)
+        new_doc = Document(id=doc_id, filename=file.filename or "unknown.pdf", gcs_uri=gcs_uri, uploaded_by=user_id)
         db.add(new_doc)
         db.commit()
         db.refresh(new_doc)

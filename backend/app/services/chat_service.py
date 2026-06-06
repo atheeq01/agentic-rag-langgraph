@@ -33,13 +33,13 @@ def get_session_messages(db: Session, session_id: UUID):
     return db.scalars(stmt).all()
 
 def add_feedback(db: Session, message_id:UUID ,feedback: FeedbackCreate):
-    feedback = MessageFeedback(
+    feedback_db = MessageFeedback(
         message_id = message_id,
-        rating = feedback.rating,
+        rating = bool(feedback.rating > 0),
         reason = feedback.reason,
     )
-    db.add(feedback)
+    db.add(feedback_db)
     db.commit()
-    db.refresh(feedback)
-    return feedback
+    db.refresh(feedback_db)
+    return feedback_db
 

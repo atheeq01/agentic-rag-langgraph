@@ -37,7 +37,7 @@ export default function ManageComplaintsPage() {
     mutationFn: ({ id, note }: { id: string, note: string }) => 
       api.patch(`/complaints/${id}`, { status: 'resolved', resolution_note: note }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['complaints', 'team'] });
+      void queryClient.invalidateQueries({ queryKey: ['complaints', 'team'] });
       setResolveModal({ isOpen: false, id: null });
       setResolutionNote("");
     }

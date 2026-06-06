@@ -1,4 +1,4 @@
-from fastapi import APIRouter,Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from uuid import UUID
@@ -81,7 +81,7 @@ async def send_message(
     ai_response_text = await run_chat(
         user_input=message_in.content,
         user=current_user,
-        session_id=message_in.session_id
+        session_id=str(message_in.session_id)
     )
     ai_message_data = ChatMessageCreate(
         session_id=message_in.session_id,

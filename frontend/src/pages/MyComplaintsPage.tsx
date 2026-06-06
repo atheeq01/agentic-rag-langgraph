@@ -45,7 +45,7 @@ export default function MyComplaintsPage() {
       against_user_id: null
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['complaints', 'me'] });
+      void queryClient.invalidateQueries({ queryKey: ['complaints', 'me'] });
       setActiveTab('history');
       setFormData({ title: '', description: '', department: 'HR', is_anonymous: false });
       setErrorMsg('');

@@ -33,7 +33,7 @@ class MessageFeedback(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True,default=uuid.uuid4)
     message_id:Mapped[uuid.UUID] = mapped_column(ForeignKey("chat_messages.id",ondelete="CASCADE"), nullable=False)
     rating: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    reason: Mapped[str] = mapped_column(String,nullable=True)
+    reason: Mapped[str | None] = mapped_column(String,nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),server_default=func.now())
 
     message = relationship("ChatMessage", back_populates="feedback")

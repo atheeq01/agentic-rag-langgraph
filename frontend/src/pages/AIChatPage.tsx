@@ -118,7 +118,7 @@ export default function AIChatPage() {
       const newId = res.data.id || res.data.session_id;
       setSessionId(newId);
       setMessages([WELCOME_MSG]);
-      queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
+      await queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
     }
   });
 
@@ -133,7 +133,7 @@ export default function AIChatPage() {
         currentSessionId = sessionRes.data.id || sessionRes.data.session_id;
         setSessionId(currentSessionId);
         // Refresh sidebar immediately
-        queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
+        await queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
       }
 
       const res = await api.post('/ai/messages', {
@@ -165,7 +165,7 @@ export default function AIChatPage() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         citations: data.citations || []
       }]);
-      queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
+      await queryClient.invalidateQueries({ queryKey: ['ai-sessions'] });
     },
     onError: () => {
       setMessages(prev => [...prev, {

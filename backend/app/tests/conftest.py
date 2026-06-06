@@ -1,28 +1,31 @@
-import os
 import pytest
 from dotenv import load_dotenv
 
 # 1. LOAD REAL ENVIRONMENT VARIABLES FIRST
 load_dotenv()
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-from fastapi.testclient import TestClient
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
-import langgraph.checkpoint.postgres.aio
-from langgraph.checkpoint.memory import MemorySaver
-import psycopg_pool
+import langgraph.checkpoint.postgres.aio  # noqa: E402
+from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
+import psycopg_pool  # noqa: E402
 
 class MockAsyncPostgresSaver(MemorySaver):
+    def __init__(self, pool):
+        super().__init__()
+        
     async def setup(self):
         pass
 
 class MockPool:
     async def open(self): pass
+    async def close(self): pass
     def __init__(self, *args, **kwargs): pass
 
-langgraph.checkpoint.postgres.aio.AsyncPostgresSaver = lambda pool: MockAsyncPostgresSaver()
+langgraph.checkpoint.postgres.aio.AsyncPostgresSaver = MockAsyncPostgresSaver
 psycopg_pool.AsyncConnectionPool = MockPool
 
 # 2. CREATE THE SQLITE TEST ENGINE FOR DB
@@ -35,13 +38,13 @@ test_engine = create_engine(
 )
 
 # HIJACK THE BACKEND'S DB ENGINE
-import app.db.session
+import app.db.session  # noqa: E402
 app.db.session.engine = test_engine
 
 # 3. IMPORT YOUR APP
-from app.main import app
-from app.db.session import get_db
-from app.db.session import Base
+from app.main import app  # noqa: E402
+from app.db.session import get_db  # noqa: E402
+from app.db.session import Base  # noqa: E402
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
@@ -60,6 +63,8 @@ def client(db):
     def override_get_db():
         yield db
 
+    from fastapi import FastAPI
+    assert isinstance(app, FastAPI)
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
