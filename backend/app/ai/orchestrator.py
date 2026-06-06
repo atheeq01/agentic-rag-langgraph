@@ -87,8 +87,10 @@ class State(TypedDict):
 
 
 def get_system_context(state: State, base_prompt: str) -> str:
+    import zoneinfo
     ctx = state.get("user_context", {})
-    today = datetime.now().strftime("%Y-%m-%d")
+    tz = zoneinfo.ZoneInfo("Asia/Colombo")
+    today = datetime.now(tz).strftime("%Y-%m-%d")
     return (
         f"{base_prompt}\n\n"
         f"SYSTEM CONTEXT (DO NOT ASK USER)\n"

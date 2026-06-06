@@ -9,7 +9,7 @@ from app.schemas.leave import LeaveCreate
 from fastapi import HTTPException
 
 # Processes new leave applications and validates against notice and balance rules
-def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
+def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate, commit: bool = True):
     user = db.get(User, user_id)
 
     if not user:
@@ -34,7 +34,6 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
                 status_code=400,
                 detail=f"Insufficient Annual Leave. Balance: {user.annual_leave_balance}"
             )
-        user.annual_leave_balance -= duration
 
     elif leave_type_lower == "sick":
         if user.sick_leave_balance < duration:
@@ -42,7 +41,6 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
                 status_code=400,
                 detail=f"Insufficient Sick Leave. Balance: {user.sick_leave_balance}"
             )
-        user.sick_leave_balance -= duration
 
     leave = Leave(
         **leave_in.model_dump(),
@@ -51,8 +49,11 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate):
     )
 
     db.add(leave)
-    db.commit()
-    db.refresh(leave)
+    if commit:
+        db.commit()
+        db.refresh(leave)
+    else:
+        db.flush()
 
     return leave
 
@@ -121,6 +122,16 @@ def approve_leave(db: Session, leave_id: UUID, approver_id: UUID, approve: bool)
     leave.status = "approved" if approve else "rejected"
     leave.approved_by = approver_id
     leave.approved_at = datetime.now(timezone.utc)
+
+    if approve:
+        duration = (leave.end_date - leave.start_date).days + 1
+        employee = db.get(User, leave.user_id)
+        if employee:
+            leave_type_lower = leave.leave_type.lower()
+            if leave_type_lower == "annual" and employee.annual_leave_balance >= duration:
+                employee.annual_leave_balance -= duration
+            elif leave_type_lower == "sick" and employee.sick_leave_balance >= duration:
+                employee.sick_leave_balance -= duration
 
     db.commit()
     db.refresh(leave)

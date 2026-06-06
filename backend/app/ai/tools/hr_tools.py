@@ -85,12 +85,16 @@ def make_tools_for_user(user):
 
     @tool
     def get_current_date() -> str:
-        """Returns the current system date (YYYY-MM-DD)."""
-        return datetime.now().strftime("%Y-%m-%d")
+        """Returns the current date in Asia/Colombo timezone (YYYY-MM-DD)."""
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("Asia/Colombo")
+        return datetime.now(tz).strftime("%Y-%m-%d")
 
     @tool
-    def check_sql_leave_balance(employee_id: str) -> str:
-        """Check annual leave and sick leave balance, name, and email for a given employee ID."""
+    def check_sql_leave_balance(employee_id: str = "") -> str:
+        """Check annual leave and sick leave balance, name, and email for a given employee ID. Leave empty to check your own balance."""
+        employee_id = employee_id.strip(' "\'') if employee_id else str(user.id)
+
         if str(user.id) != employee_id and user.role not in ("hr", "admin"):
             return "ERROR: You do not have permission to view another employee's leave balance."
 
@@ -102,9 +106,11 @@ def make_tools_for_user(user):
 
         db = SessionLocal()
         try:
-            emp = db.query(User).filter(User.id == employee_id).first()
+            emp = db.query(User).filter(User.id == uuid_obj).first()
             if not emp:
+                print(f"[LeaveBalance] No user found for ID: {uuid_obj}")
                 return f"Employee {employee_id} not found."
+            print(f"[LeaveBalance] Found: {emp.full_name}, annual={emp.annual_leave_balance}, sick={emp.sick_leave_balance}")
             return (
                 f"Name: {emp.full_name}, Email: {emp.email}, ID: {employee_id}. "
                 f"Balance: {emp.annual_leave_balance} Annual Leave, "
@@ -120,9 +126,10 @@ def make_tools_for_user(user):
 
     @tool
     def apply_leave_tool(
-            start_date: str, end_date: str, leave_type: str, reason: str
+            start_date: str, end_date: str, leave_type: str, reason: str,
+            recipient: str = "", subject: str = "", body: str = "", send_email: bool = False
     ) -> str:
-        """Apply a leave request in the database. leave_type MUST be 'annual' or 'sick'."""
+        """Apply a leave request in the database. If send_email is True, sends an email and commits database atomically."""
         try:
             start = date.fromisoformat(start_date)
             end = date.fromisoformat(end_date)
@@ -152,6 +159,9 @@ def make_tools_for_user(user):
 
         db = SessionLocal()
         try:
+            if send_email and not user.google_refresh_token:
+                return "Failed: GOOGLE_AUTH_REQUIRED. You must connect your Gmail to submit this request."
+
             l_type = leave_type.lower()
             if "annual" in l_type or "pto" in l_type:
                 l_type = "annual"
@@ -166,9 +176,30 @@ def make_tools_for_user(user):
                 leave_type=l_type,
                 reason=reason,
             )
-            leave = leave_service.apply_leave(db, user_id=user.id, leave_in=leave_data)
+            # Apply leave but do not commit yet (hold transaction)
+            leave = leave_service.apply_leave(db, user_id=user.id, leave_in=leave_data, commit=False)
+            
+            if send_email:
+                try:
+                    service = get_gmail_service(user)
+                    message = EmailMessage()
+                    message.set_content(body)
+                    message["To"] = recipient
+                    message["Subject"] = subject
+
+                    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+                    service.users().messages().send(userId="me", body={"raw": raw}).execute()
+                    print(f"[EMAIL SENT] → {recipient}")
+                except Exception as e:
+                    # Rollback the leave if the email fails to prevent silent orphan records
+                    db.rollback()
+                    print(f"[EMAIL FAILED] → {e}")
+                    return f"Failed to send email ({str(e)}). Leave request was aborted."
+
+            # Everything succeeded, commit the transaction
+            db.commit()
             print(f"LEAVE SAVED: {leave.id}")
-            return "Leave successfully applied."
+            return "Leave successfully applied and email sent." if send_email else "Leave successfully applied."
 
         except HTTPException as he:
             db.rollback()

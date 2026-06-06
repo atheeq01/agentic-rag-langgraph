@@ -78,18 +78,10 @@ CONFIRMATION SAFETY:
 - If the response is ambiguous, ask for clarification before executing tools.
 
 STEP E: Execute.
-Upon valid confirmation, execute in this exact order:
-1. `apply_leave_tool`
-   - Pass:
-     - start_date
-     - end_date
-     - leave_type
-     - reason
-
-2. `draft_and_send_email`
-   - Use `is_confirmed=True`
-
-- If the database update succeeds but email delivery fails, clearly inform the user that the leave request was saved successfully but the email notification could not be sent.
+Upon valid confirmation, call `apply_leave_tool` exactly once with all parameters:
+- Pass the standard parameters: start_date, end_date, leave_type, reason.
+- Pass the email parameters: recipient, subject, body.
+- Pass `send_email=True` to execute the database save and email dispatch simultaneously as an atomic transaction.
 
 3. ENTERPRISE GUARDRAILS:
 - TOOL FAILURE:

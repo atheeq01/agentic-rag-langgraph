@@ -148,6 +148,17 @@ def test_leave_application_deducts_balance_correctly(client, db):
 
     res = submit_leave(client, headers, start=start, end=end, leave_type="Annual")
     assert res.status_code in [200, 201]
+    leave_id = res.json()["id"]
 
     db.refresh(user)
+    # Balance should NOT be deducted on application
+    assert user.annual_leave_balance == initial_balance
+
+    # Now approve it
+    admin_headers = get_auth(client, db, "super_admin_deduct@test.com", role="admin")
+    approve_res = client.post(f"/leaves/{leave_id}/action?approve=true", headers=admin_headers)
+    assert approve_res.status_code == 200
+
+    db.refresh(user)
+    # Now it should be deducted
     assert user.annual_leave_balance == (initial_balance - 3)
