@@ -39,6 +39,7 @@ _base_llm = ChatGoogleGenerativeAI(
     model=DEFAULT_MODEL,
     temperature=0.2,
     timeout=30,
+    api_key=API_KEY,
 )
 
 

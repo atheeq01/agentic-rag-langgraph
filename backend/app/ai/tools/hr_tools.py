@@ -88,6 +88,12 @@ def make_tools_for_user(user):
         if str(user.id) != employee_id and user.role not in ("hr", "admin"):
             return "ERROR: You do not have permission to view another employee's leave balance."
 
+        import uuid
+        try:
+            uuid_obj = uuid.UUID(employee_id)
+        except ValueError:
+            return "ERROR: Invalid Employee ID format. Please strictly use the Employee ID from the System Context."
+
         db = SessionLocal()
         try:
             emp = db.query(User).filter(User.id == employee_id).first()

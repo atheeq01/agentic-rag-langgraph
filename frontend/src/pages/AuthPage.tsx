@@ -83,7 +83,14 @@ export default function AuthPage() {
       navigate('/dashboard');
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.detail || 'Registration failed. Please try again.');
+      const backendDetail = err.response?.data?.detail;
+      if (typeof backendDetail === 'string') {
+        setErrorMsg(backendDetail);
+      } else if (Array.isArray(backendDetail)) {
+        setErrorMsg(backendDetail[0]?.msg || 'Registration failed');
+      } else {
+        setErrorMsg('Registration failed. Please try again.');
+      }
     }
   });
 

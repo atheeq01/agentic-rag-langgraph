@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.endpoints import auth, leaves, ai_chat, complaints, documents, google_auth, users
 from app.db.session import Base, engine
+from app.core.config import settings
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -47,7 +48,7 @@ def rate_limit_handler(request: Request, exc: Exception) -> Response:
 app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 origins = []
-frontend_url = os.getenv("FRONTEND_URL")
+frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173") or "http://localhost:5173"
 
 
 

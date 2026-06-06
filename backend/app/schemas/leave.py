@@ -9,21 +9,20 @@ class LeaveBase(BaseModel):
     leave_type: str
     reason: str | None = None
 
+class LeaveCreate(LeaveBase):
     @field_validator("start_date")
+    @classmethod
     def validate_not_past(cls, v):
         if v < date.today():
             raise ValueError("Start date cannot be in the past.")
         return v
 
     @field_validator("end_date")
+    @classmethod
     def validate_dates(cls, v, info):
         if "start_date" in info.data and v < info.data["start_date"]:
             raise ValueError("End date must be on or after start date.")
         return v
-
-
-class LeaveCreate(LeaveBase):
-    pass
 
 
 class LeaveOut(LeaveBase):
