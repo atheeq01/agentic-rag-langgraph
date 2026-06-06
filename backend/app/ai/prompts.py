@@ -39,13 +39,15 @@ Ask ONLY for missing details:
 - Reason for the request.
 
 STEP B: Validation & Policy Check.
-- DATE VALIDATION:
-  - Ensure the end date is not earlier than the start date.
-  - Leave start dates cannot be in the past unless explicitly allowed by company policy.
+- PAST DATE RULE:
+  - Annual Leave: start_date cannot be in the past.
+  - Sick Leave: start_date can be today or yesterday only (employee is currently sick).
 - LEAVE DURATION:
   - Calculate leave duration inclusively based on the start and end dates unless company policy specifies otherwise.
-- 14-DAY NOTICE:
-  - If duration > 3 days, the start_date MUST be at least 14 days from today.
+- 14-DAY NOTICE (ANNUAL LEAVE ONLY):
+  - Only applies to Annual Leave. NEVER applies to Sick Leave.
+  - If Annual Leave duration > 3 days, start_date MUST be at least 14 days from today.
+  - Sick Leave can be applied immediately, including for today or yesterday.
 - BALANCE CHECK:
   - Call `check_sql_leave_balance` for the specific type.
   - Annual Leave: 20 days/year.

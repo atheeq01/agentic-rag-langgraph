@@ -2,6 +2,12 @@ import base64
 import smtplib
 from datetime import datetime, date
 from email.message import EmailMessage
+import zoneinfo
+
+def _get_today(user_timezone: str = "Asia/Colombo") -> date:
+    """Return today's date in the user's local timezone."""
+    tz = zoneinfo.ZoneInfo(user_timezone)
+    return datetime.now(tz).date()
 
 from fastapi import HTTPException
 from google.auth.transport.requests import Request
@@ -120,17 +126,29 @@ def make_tools_for_user(user):
         try:
             start = date.fromisoformat(start_date)
             end = date.fromisoformat(end_date)
-            today = date.today()
+            today = _get_today()
         except ValueError:
             return "Failed: Invalid date format. Please use YYYY-MM-DD."
 
         if end < start:
             return "Failed: end_date cannot be earlier than start_date."
-        if start < today:
+        
+        l_type_check = leave_type.lower()
+        is_sick = "sick" in l_type_check
+
+        if not is_sick and start < today:
             return "Failed: start_date cannot be in the past."
+
+        # Sick leave: allow today and yesterday (already sick)
+        if is_sick and start < today:
+            if (today - start).days > 1:
+                return "Failed: Sick leave start date cannot be more than 1 day in the past."
+
         duration = (end - start).days + 1
-        if duration > 3 and (start - today).days < 14:
-            return "Failed: leave longer than 3 days requires 14 days' advance notice."
+
+        # 14-day notice ONLY applies to annual leave, never sick leave
+        if not is_sick and duration > 3 and (start - today).days < 14:
+            return "Failed: Annual leave longer than 3 days requires 14 days' advance notice."
 
         db = SessionLocal()
         try:
