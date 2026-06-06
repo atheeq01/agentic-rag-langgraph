@@ -25,10 +25,10 @@ async def lifespan(fastapi_app: FastAPI):
     FastAPI lifespan context manager.
     Code before `yield` runs at startup; code after runs at shutdown.
     """
-    await startup()
+    await startup()          # opens PG pool + runs checkpointer migrations
     print("[App] ApexHR API ready.")
-    yield
-    await shutdown()
+    yield                    # application runs here
+    await shutdown()         # drains PG pool gracefully
     print("[App] ApexHR API shut down.")
 
 app = FastAPI(
@@ -82,7 +82,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 key="csrf_token", 
                 value=secrets.token_hex(32), 
                 httponly=False, 
-                samesite="lax", 
+                samesite="none", 
                 secure=True
             )
         return response

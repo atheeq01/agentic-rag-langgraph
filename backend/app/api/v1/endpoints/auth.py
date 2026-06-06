@@ -29,7 +29,7 @@ def register(user_in: UserCreate, response: Response, db: Session = Depends(get_
         value=f"Bearer {token}",
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=3600
     )
     return {"access_token": token, "token_type": "bearer"}
@@ -48,7 +48,7 @@ def login(response: Response, credentials: OAuth2PasswordRequestForm = Depends()
         value=f"Bearer {token}",
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=3600
     )
     return {
@@ -71,7 +71,7 @@ def login_json(credentials: UserLogin, response: Response, db: Session = Depends
         value=f"Bearer {token}",
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=3600
     )
     return {
