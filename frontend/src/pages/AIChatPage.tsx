@@ -114,7 +114,7 @@ export default function AIChatPage() {
   // "+ New Chat" — create a fresh session immediately
   const newChatMutation = useMutation({
     mutationFn: () => api.post('/ai/sessions'),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       const newId = res.data.id || res.data.session_id;
       setSessionId(newId);
       setMessages([WELCOME_MSG]);

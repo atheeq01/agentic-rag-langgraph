@@ -37,7 +37,7 @@ function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
 
   const mutation = useMutation({
     mutationFn: (data: any) => api.post('/users/', data),
-    onSuccess: () => {
+    onSuccess: async () => {
       setStatus({ type: 'success', message: 'User created successfully!' });
       await queryClient.invalidateQueries({ queryKey: ['users'] });
       setTimeout(() => { 
@@ -118,7 +118,7 @@ function EditUserModal({ isOpen, onClose, user, allUsers }: { isOpen: boolean; o
 
   const toggleStatus = useMutation({
     mutationFn: () => api.patch(`/users/${user.id}/${user.is_active === false ? 'activate' : 'deactivate'}`),
-    onSuccess: () => await queryClient.invalidateQueries({ queryKey: ['users'] })
+    onSuccess: async () => await queryClient.invalidateQueries({ queryKey: ['users'] })
   });
 
   const unlock = useMutation({
@@ -295,7 +295,7 @@ function TeamTab({ isAdmin }: { isAdmin: boolean }) {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/users/${id}`),
-    onSuccess: () => await queryClient.invalidateQueries({ queryKey: ['users'] })
+    onSuccess: async () => await queryClient.invalidateQueries({ queryKey: ['users'] })
   });
 
   return (
