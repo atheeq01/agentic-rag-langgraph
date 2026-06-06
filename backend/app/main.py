@@ -78,13 +78,18 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         
         if not csrf_cookie:
+            token = secrets.token_hex(32)
             response.set_cookie(
                 key="csrf_token", 
-                value=secrets.token_hex(32), 
+                value=token, 
                 httponly=False, 
                 samesite="none", 
                 secure=True
             )
+            response.headers["X-CSRF-Token"] = token
+        else:
+            response.headers["X-CSRF-Token"] = csrf_cookie
+            
         return response
 
 if frontend_url:
@@ -100,7 +105,8 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
+    expose_headers=["X-CSRF-Token"]
 )
 
 # Include routers

@@ -12,8 +12,18 @@ export const api = axios.create({
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const csrfToken = response.headers['x-csrf-token'];
+    if (csrfToken) {
+      api.defaults.headers.common['X-CSRF-Token'] = csrfToken;
+    }
+    return response;
+  },
   (error) => {
+    const csrfToken = error.response?.headers?.['x-csrf-token'];
+    if (csrfToken) {
+      api.defaults.headers.common['X-CSRF-Token'] = csrfToken;
+    }
     const isLoginPage = window.location.pathname === '/login' || window.location.pathname === '/';
     
     // Only auto-logout if the error is 401 AND we aren't already trying to login
