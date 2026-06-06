@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta, date
+import zoneinfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
@@ -7,6 +8,9 @@ from app.models.leave import Leave
 from app.models.user import User
 from app.schemas.leave import LeaveCreate
 from fastapi import HTTPException
+
+def _get_today() -> date:
+    return datetime.now(zoneinfo.ZoneInfo("Asia/Colombo")).date()
 
 # Processes new leave applications and validates against notice and balance rules
 def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate, commit: bool = True):
@@ -20,7 +24,7 @@ def apply_leave(db: Session, user_id: UUID, leave_in: LeaveCreate, commit: bool 
     # Rule: All NON-sick leaves require 14 days advance notice
     leave_type_lower = leave_in.leave_type.lower()
     if leave_type_lower != "sick":
-        notice_deadline = date.today() + timedelta(days=14)
+        notice_deadline = _get_today() + timedelta(days=14)
         if duration > 3 and leave_in.start_date < notice_deadline:
             raise HTTPException(
                 status_code=400,

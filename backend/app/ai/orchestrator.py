@@ -219,6 +219,7 @@ async def _run_agent_loop(
 
 _graph_cache = {}
 MAX_CACHE_SIZE = 100
+GRAPH_VERSION = "v3"
 
 # Public entry point
 async def run_chat(user_input: str, user, session_id: str) -> str:
@@ -252,7 +253,7 @@ async def run_chat(user_input: str, user, session_id: str) -> str:
         bound = _base_llm.bind_tools(list(tm.values()))
         return await _run_agent_loop(state, bound, COMMON_AGENT_PROMPT, tm)
 
-    sid = str(session_id)
+    sid = f"{GRAPH_VERSION}:{session_id}"
     if sid not in _graph_cache:
         if len(_graph_cache) >= MAX_CACHE_SIZE:
             _graph_cache.pop(next(iter(_graph_cache)))
