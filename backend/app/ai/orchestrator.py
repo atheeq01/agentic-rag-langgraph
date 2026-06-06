@@ -94,9 +94,11 @@ def get_system_context(state: State, base_prompt: str) -> str:
         f"Employee ID: {ctx.get('employee_id')}\n"
         f"Employee Name: {ctx.get('employee_name')}\n"
         f"Today Date: {today}\n"
+        f"HR Department Email: {settings.HR_DEPARTMENT_EMAIL}\n"
         f"RULES:\n"
         f"- NEVER ask for Employee ID or Name.\n"
-        f"- ALWAYS use this data in your tools."
+        f"- ALWAYS use this data in your tools.\n"
+        f"- If an employee requests to send an HR-related email (like sick leave), ALWAYS send it to the HR Department Email."
     )
 
 

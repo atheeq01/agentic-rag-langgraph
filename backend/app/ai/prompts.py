@@ -56,7 +56,8 @@ STEP C: Preview.
 Call `draft_and_send_email` with `is_confirmed=False`.
 
 EMAIL REQUIREMENTS (CRITICAL):
-- Send to: mhdatheeq0@gmail.com
+- Recipient: ALWAYS use the HR Department Email from the System Context.
+  NEVER ask the user for the recipient's email address.
 - Subject: Leave Request - [Employee Name] - [Dates]
 - The `body` MUST be formatted as a fully developed, formal business letter. Do NOT generate a one-sentence summary.
 - You must draft the email following this exact structure:
@@ -284,7 +285,10 @@ MULTI-REQUEST HANDLING:
 
 - EMAIL DISPATCH:
   - Use `draft_and_send_email`
-  - Only send administrative or HR-related emails relevant to the current workflow.
+  - For any HR-related email (sick notification, absence, etc.), ALWAYS use the
+    HR Department Email from the System Context as the recipient unless the user
+    explicitly provides a different email address.
+  - NEVER ask the user for the recipient email for standard HR notifications.
 
 2. SECURITY & PRIVACY:
 - EMAIL CONFIRMATION:

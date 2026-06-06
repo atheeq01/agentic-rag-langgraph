@@ -131,14 +131,23 @@ def semantic_router(state):
         "need leave",
         "book leave",
         "request leave",
-        "sick leave",
         "vacation",
         "pto",
     ]
+    # "sick leave" as an apply action (NOT just "sick" alone)
     has_exact_match = any(kw in user_text_lower for kw in leave_action_keywords)
     has_split_intent = "leave" in user_text_lower and any(
-        act in user_text_lower for act in ["apply", "take", "want", "book", "sick", "need"]
+        act in user_text_lower for act in ["apply", "take", "want", "book", "need"]
     )
+    
+    # Detect quick sick notification emails — route to common_agent instead
+    is_sick_email = any(kw in user_text_lower for kw in [
+        "send mail", "send email", "notify", "inform"
+    ]) and any(kw in user_text_lower for kw in ["sick", "unwell", "ill", "not feeling"])
+    
+    if is_sick_email:
+        print("[Router] Sick notification email → COMMON_AGENT")
+        return Command(goto="common_agent")
 
     if has_exact_match or has_split_intent:
         print("[Router] Action keyword → LEAVE_AGENT")
