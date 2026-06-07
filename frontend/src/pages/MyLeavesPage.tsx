@@ -271,7 +271,7 @@ export default function MyLeavesPage() {
               </button>
             </form>
           </motion.div>
-        ) : (
+        ) : activeTab === 'history' ? (
           <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-panel overflow-hidden border border-white/40 shadow-2xl bg-white/30 backdrop-blur-md rounded-3xl">
             <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[700px]">
