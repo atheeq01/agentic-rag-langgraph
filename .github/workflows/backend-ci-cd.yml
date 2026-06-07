@@ -121,22 +121,14 @@ jobs:
           echo "✅ Backend deployed to: $URL"
           echo "backend_url=$URL" >> $GITHUB_OUTPUT
 
-      - name: Update VITE_API_URL GitHub Secret
+      - name: Trigger Frontend Redeploy
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BACKEND_URL: ${{ steps.get_url.outputs.backend_url }}
         run: |
-          # Encrypt and update the VITE_API_URL repository secret via GitHub API
-          # so the next frontend build always uses the correct backend URL.
-          gh secret set VITE_API_URL --body "$BACKEND_URL" --repo ${{ github.repository }}
-          echo "✅ VITE_API_URL secret updated to: $BACKEND_URL"
-
-      - name: Trigger Frontend Redeploy
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Kick off the frontend workflow so it rebuilds with the new VITE_API_URL.
+          # Kick off the frontend workflow so it rebuilds with the new backend URL
           gh workflow run frontend-ci-cd.yml \
             --repo ${{ github.repository }} \
-            --ref main
+            --ref main \
+            -f backend_url="$BACKEND_URL"
           echo "✅ Frontend redeploy triggered"
