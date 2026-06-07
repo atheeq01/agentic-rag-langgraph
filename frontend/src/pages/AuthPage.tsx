@@ -43,7 +43,11 @@ export default function AuthPage() {
         role: data.user.role,
         name: data.user.full_name || data.user.email.split('@')[0],
         annual_leave_balance: data.user.annual_leave_balance,
-        sick_leave_balance: data.user.sick_leave_balance
+        sick_leave_balance: data.user.sick_leave_balance,
+        maternity_leave_balance: data.user.maternity_leave_balance,
+        paternity_leave_balance: data.user.paternity_leave_balance,
+        bereavement_leave_balance: data.user.bereavement_leave_balance,
+        unpaid_leave_balance: data.user.unpaid_leave_balance
       });
       navigate('/dashboard');
     },
@@ -78,7 +82,11 @@ export default function AuthPage() {
         role: data.user.role,
         name: data.user.full_name || fullName || data.user.email.split('@')[0],
         annual_leave_balance: data.user.annual_leave_balance,
-        sick_leave_balance: data.user.sick_leave_balance
+        sick_leave_balance: data.user.sick_leave_balance,
+        maternity_leave_balance: data.user.maternity_leave_balance,
+        paternity_leave_balance: data.user.paternity_leave_balance,
+        bereavement_leave_balance: data.user.bereavement_leave_balance,
+        unpaid_leave_balance: data.user.unpaid_leave_balance
       });
       navigate('/dashboard');
     },
@@ -112,7 +120,11 @@ export default function AuthPage() {
         role: data.user.role,
         name: data.user.full_name || data.user.email.split('@')[0],
         annual_leave_balance: data.user.annual_leave_balance,
-        sick_leave_balance: data.user.sick_leave_balance
+        sick_leave_balance: data.user.sick_leave_balance,
+        maternity_leave_balance: data.user.maternity_leave_balance,
+        paternity_leave_balance: data.user.paternity_leave_balance,
+        bereavement_leave_balance: data.user.bereavement_leave_balance,
+        unpaid_leave_balance: data.user.unpaid_leave_balance
       });
       navigate('/dashboard');
     },

@@ -10,6 +10,10 @@ interface UserData {
   name: string;
   annual_leave_balance?: number;
   sick_leave_balance?: number;
+  maternity_leave_balance?: number;
+  paternity_leave_balance?: number;
+  bereavement_leave_balance?: number;
+  unpaid_leave_balance?: number;
 }
 
 interface AuthState {

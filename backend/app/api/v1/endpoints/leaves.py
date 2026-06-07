@@ -10,9 +10,18 @@ from app.api.v1.deps import get_current_user
 from app.core.permissions import require_role
 from app.core.constants import ROLE_MANAGER, ROLE_HR, ROLE_ADMIN
 from app.models.user import User
-
+import os
 
 router = APIRouter(prefix="/leaves", tags=["leaves"])
+
+@router.get("/policy")
+def get_policy():
+    policy_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "policy.txt")
+    if os.path.exists(policy_path):
+        with open(policy_path, "r") as f:
+            return {"policy": f.read()}
+    return {"policy": "Leave policy not found."}
+
 
 
 @router.post("/", response_model=LeaveOut)

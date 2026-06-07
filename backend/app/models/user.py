@@ -21,6 +21,10 @@ class User(Base):
 
     annual_leave_balance: Mapped[int] = mapped_column(Integer, default=20)
     sick_leave_balance: Mapped[int] = mapped_column(Integer, default=10)
+    maternity_leave_balance: Mapped[int] = mapped_column(Integer, default=84)
+    paternity_leave_balance: Mapped[int] = mapped_column(Integer, default=28)
+    bereavement_leave_balance: Mapped[int] = mapped_column(Integer, default=5)
+    unpaid_leave_balance: Mapped[int] = mapped_column(Integer, default=56)
 
     manager_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 

@@ -19,10 +19,14 @@ interface Leave {
 interface UserProfile {
   annual_leave_balance: number;
   sick_leave_balance: number;
+  maternity_leave_balance: number;
+  paternity_leave_balance: number;
+  bereavement_leave_balance: number;
+  unpaid_leave_balance: number;
 }
 
 export default function MyLeavesPage() {
-  const [activeTab, setActiveTab] = useState<'file' | 'history'>('file');
+  const [activeTab, setActiveTab] = useState<'file' | 'history' | 'policy'>('file');
   const [formData, setFormData] = useState({ 
     start_date: '', 
     end_date: '', 
@@ -35,6 +39,11 @@ export default function MyLeavesPage() {
   const { data: userProfile } = useQuery<UserProfile>({ 
     queryKey: ['auth', 'me'], 
     queryFn: () => api.get('/auth/me').then(res => res.data) 
+  });
+
+  const { data: policyData } = useQuery<{ policy: string }>({
+    queryKey: ['leaves', 'policy'],
+    queryFn: () => api.get('/leaves/policy').then(res => res.data)
   });
 
   const { data: myLeaves = [], isLoading } = useQuery<Leave[]>({
@@ -70,8 +79,8 @@ export default function MyLeavesPage() {
     const duration = calculateDuration(formData.start_date, formData.end_date);
     const daysInAdvance = Math.ceil((new Date(formData.start_date).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
 
-    if (duration > 3 && daysInAdvance < 14) {
-      setErrorMsg(`Your request is for ${duration} days. Leaves exceeding 3 days must be submitted at least 14 days in advance.`);
+    if (formData.leave_type === 'Annual' && daysInAdvance < 14) {
+      setErrorMsg(`Annual leaves must be submitted at least 14 days in advance.`);
       return;
     }
 
@@ -94,7 +103,7 @@ export default function MyLeavesPage() {
 
   const getMinStartDate = () => {
     const minDate = new Date();
-    if (formData.leave_type !== 'Sick') {
+    if (formData.leave_type === 'Annual') {
       minDate.setDate(minDate.getDate() + 14); 
     }
     return minDate.toISOString().split("T")[0];
@@ -132,8 +141,9 @@ export default function MyLeavesPage() {
     { value: 'Annual', label: 'Annual Leave (Paid)' },
     { value: 'Sick', label: 'Sick Leave' },
     { value: 'Bereavement', label: 'Bereavement' },
-    { value: 'Maternity/Paternity', label: 'Maternity/Paternity' },
-    { value: 'Unpaid', label: 'Unpaid Leave' },
+    { value: 'Maternity', label: 'Maternity' },
+    { value: 'Paternity', label: 'Paternity' },
+    { value: 'Unpaid Family', label: 'Unpaid Family' },
   ];
 
   return (
@@ -156,6 +166,30 @@ export default function MyLeavesPage() {
           icon={Clock} 
           color="text-blue-600" 
         />
+        <BalanceCard 
+          title="Maternity" 
+          days={userProfile?.maternity_leave_balance ?? 0} 
+          icon={Calendar} 
+          color="text-purple-600" 
+        />
+        <BalanceCard 
+          title="Paternity" 
+          days={userProfile?.paternity_leave_balance ?? 0} 
+          icon={Calendar} 
+          color="text-indigo-600" 
+        />
+        <BalanceCard 
+          title="Bereavement" 
+          days={userProfile?.bereavement_leave_balance ?? 0} 
+          icon={AlertCircle} 
+          color="text-slate-600" 
+        />
+        <BalanceCard 
+          title="Unpaid Family" 
+          days={userProfile?.unpaid_leave_balance ?? 0} 
+          icon={Clock} 
+          color="text-orange-600" 
+        />
       </div>
 
       <div className="flex gap-1 p-1 bg-white/40 backdrop-blur-md border border-white/20 rounded-2xl w-fit">
@@ -164,6 +198,9 @@ export default function MyLeavesPage() {
         </button>
         <button onClick={() => setActiveTab('history')} className={cn("px-6 py-2.5 rounded-xl text-xs font-bold uppercase", activeTab === 'history' ? "bg-white text-primary shadow-sm" : "text-slate-500")}>
           <MessageSquare className="w-4 h-4 inline mr-2" /> My Applications
+        </button>
+        <button onClick={() => setActiveTab('policy')} className={cn("px-6 py-2.5 rounded-xl text-xs font-bold uppercase", activeTab === 'policy' ? "bg-white text-primary shadow-sm" : "text-slate-500")}>
+          <Calendar className="w-4 h-4 inline mr-2" /> Leave Policy
         </button>
       </div>
 
@@ -181,7 +218,7 @@ export default function MyLeavesPage() {
               <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3 text-amber-800 text-[11px] font-bold leading-relaxed shadow-sm">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div>
-                  <span className="uppercase tracking-wider">Policy Notice:</span> Leaves exceeding 3 days must be submitted at least 14 days in advance.
+                  <span className="uppercase tracking-wider">Policy Notice:</span> Annual leaves must be submitted at least 14 days in advance. Sick leaves exceeding 3 days require a doctor's certificate upon return.
                 </div>
               </div>
 
@@ -281,7 +318,14 @@ export default function MyLeavesPage() {
               </table>
             </div>
           </motion.div>
-        )}
+        ) : activeTab === 'policy' ? (
+          <motion.div key="policy" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-panel p-8 md:p-10 border border-white/40 shadow-2xl bg-white/30 backdrop-blur-md rounded-3xl">
+            <h2 className="text-xl font-bold mb-6 text-slate-900 uppercase tracking-tight">Company Leave Policy</h2>
+            <div className="prose prose-sm md:prose-base max-w-none text-slate-700 whitespace-pre-wrap font-medium">
+              {policyData?.policy || 'Loading policy...'}
+            </div>
+          </motion.div>
+        ) : null}
       </AnimatePresence>
     </div>
   );

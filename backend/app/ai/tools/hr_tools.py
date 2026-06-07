@@ -110,11 +110,26 @@ def make_tools_for_user(user):
             if not emp:
                 print(f"[LeaveBalance] No user found for ID: {uuid_obj}")
                 return f"Employee {employee_id} not found."
-            print(f"[LeaveBalance] Found: {emp.full_name}, annual={emp.annual_leave_balance}, sick={emp.sick_leave_balance}")
+            pending_leaves = db.query(Leave).filter(
+                Leave.user_id == emp.id,
+                Leave.status == "pending"
+            ).all()
+
+            annual_pending = sum((l.end_date - l.start_date).days + 1 for l in pending_leaves if l.leave_type.lower() == "annual")
+            sick_pending = sum((l.end_date - l.start_date).days + 1 for l in pending_leaves if l.leave_type.lower() == "sick")
+            maternity_pending = sum((l.end_date - l.start_date).days + 1 for l in pending_leaves if l.leave_type.lower() == "maternity")
+            paternity_pending = sum((l.end_date - l.start_date).days + 1 for l in pending_leaves if l.leave_type.lower() == "paternity")
+            bereavement_pending = sum((l.end_date - l.start_date).days + 1 for l in pending_leaves if l.leave_type.lower() == "bereavement")
+            unpaid_pending = sum((l.end_date - l.start_date).days + 1 for l in pending_leaves if l.leave_type.lower() == "unpaid family")
+
             return (
-                f"Name: {emp.full_name}, Email: {emp.email}, ID: {employee_id}. "
-                f"Balance: {emp.annual_leave_balance} Annual Leave, "
-                f"{emp.sick_leave_balance} Sick Leave."
+                f"Employee: {emp.full_name} ({emp.email})\n"
+                f"Annual Leave Balance: {emp.annual_leave_balance - annual_pending} days\n"
+                f"Sick Leave Balance: {emp.sick_leave_balance - sick_pending} days\n"
+                f"Maternity Leave Balance: {emp.maternity_leave_balance - maternity_pending} days\n"
+                f"Paternity Leave Balance: {emp.paternity_leave_balance - paternity_pending} days\n"
+                f"Bereavement Leave Balance: {emp.bereavement_leave_balance - bereavement_pending} days\n"
+                f"Unpaid Family Leave Balance: {emp.unpaid_leave_balance - unpaid_pending} days\n"
             )
         finally:
             db.close()
@@ -153,22 +168,30 @@ def make_tools_for_user(user):
 
         duration = (end - start).days + 1
 
-        # 14-day notice ONLY applies to annual leave, never sick leave
-        if not is_sick and duration > 3 and (start - today).days < 14:
-            return "Failed: Annual leave longer than 3 days requires 14 days' advance notice."
+        l_type_lower = leave_type.lower()
+        if "annual" in l_type_lower or "pto" in l_type_lower:
+            l_type = "Annual"
+        elif "sick" in l_type_lower:
+            l_type = "Sick"
+        elif "maternity" in l_type_lower:
+            l_type = "Maternity"
+        elif "paternity" in l_type_lower:
+            l_type = "Paternity"
+        elif "bereavement" in l_type_lower:
+            l_type = "Bereavement"
+        elif "unpaid" in l_type_lower:
+            l_type = "Unpaid Family"
+        else:
+            return "Failed: leave_type must be Annual, Sick, Maternity, Paternity, Bereavement, or Unpaid Family."
+        
+        # 14-day notice ONLY applies to annual leave strictly
+        if l_type == "Annual" and (start - today).days < 14:
+            return "Failed: All Annual leave requests require at least 14 days' advance notice."
 
         db = SessionLocal()
         try:
             if send_email and not user.google_refresh_token:
                 return "Failed: GOOGLE_AUTH_REQUIRED. You must connect your Gmail to submit this request."
-
-            l_type = leave_type.lower()
-            if "annual" in l_type or "pto" in l_type:
-                l_type = "annual"
-            elif "sick" in l_type:
-                l_type = "sick"
-            else:
-                return "Failed: leave_type must be either 'annual' or 'sick'."
 
             leave_data = LeaveCreate(
                 start_date=start_date,
@@ -194,7 +217,7 @@ def make_tools_for_user(user):
                     # Rollback the leave if the email fails to prevent silent orphan records
                     db.rollback()
                     print(f"[EMAIL FAILED] → {e}")
-                    return f"Failed to send email ({str(e)}). Leave request was aborted."
+                    return f"Failed to send email ({str(e)}). Leave request was aborted. Tell the user EXACTLY what this error says."
 
             # Everything succeeded, commit the transaction
             db.commit()
@@ -206,7 +229,7 @@ def make_tools_for_user(user):
             return f"Failed to apply leave: {he.detail}"
         except Exception as e:
             db.rollback()
-            return f"Failed to apply leave due to system error: {str(e)}"
+            return f"CRITICAL SYSTEM ERROR (Do NOT summarize, tell the user exactly this): {str(e)}"
         finally:
             db.close()
 
