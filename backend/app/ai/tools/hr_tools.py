@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.core.security import decrypt_token, encrypt_token
 from app.db.session import SessionLocal
 from app.models.user import User
+from app.models.leave import Leave
 from app.schemas.complaint import ComplaintCreate
 from app.schemas.leave import LeaveCreate
 from app.services import complaint_service, leave_service

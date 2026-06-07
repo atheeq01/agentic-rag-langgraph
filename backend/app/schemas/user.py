@@ -20,6 +20,10 @@ class UserOut(UserBase):
     manager_id: Optional[UUID] = None
     annual_leave_balance: int
     sick_leave_balance: int
+    maternity_leave_balance: int
+    paternity_leave_balance: int
+    bereavement_leave_balance: int
+    unpaid_leave_balance: int
     is_active: bool
     model_config = ConfigDict(from_attributes=True)
 

@@ -16,11 +16,11 @@ router = APIRouter(prefix="/leaves", tags=["leaves"])
 
 @router.get("/policy")
 def get_policy():
-    policy_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "policy.txt")
+    policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../policy.txt"))
     if os.path.exists(policy_path):
         with open(policy_path, "r") as f:
             return {"policy": f.read()}
-    return {"policy": "Leave policy not found."}
+    return {"policy": f"Leave policy not found at {policy_path}"}
 
 
 
