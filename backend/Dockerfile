@@ -45,4 +45,4 @@ USER appuser
 
 COPY --chown=appuser:appuser . .
 
-CMD ["sh", "-c", "python migrate_db.py && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
