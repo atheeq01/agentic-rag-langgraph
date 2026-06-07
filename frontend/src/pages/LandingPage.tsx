@@ -45,7 +45,7 @@ export default function LandingPage() {
             </div>
             
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 drop-shadow-sm">
-              APEX AI ASSISTANT
+              Apex HR
             </h1>
             
             <h2 className="text-2xl md:text-3xl font-medium text-slate-700 mb-8 max-w-3xl mx-auto leading-relaxed">
@@ -53,7 +53,7 @@ export default function LandingPage() {
             </h2>
             
             <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-              Streamline your workflow with intelligent, automated HR management. Apex AI Assistant helps employees effortlessly handle leave requests, file secure complaints, and navigate company policies through an advanced multi-agent conversational interface.
+              Streamline your workflow with intelligent, automated HR management. Apex HR helps employees effortlessly handle leave requests, file secure complaints, and navigate company policies through an advanced multi-agent conversational interface.
             </p>
             
             <button 
@@ -119,7 +119,7 @@ export default function LandingPage() {
               </div>
               
               <p className="text-lg text-slate-300 mb-10 leading-relaxed">
-                To provide these automated HR services, APEX AI ASSISTANT requires secure access to your Google Account.
+                To provide these automated HR services, Apex HR requires secure access to your Google Account.
               </p>
 
               <div className="grid md:grid-cols-2 gap-8 mb-10">
@@ -158,7 +158,7 @@ export default function LandingPage() {
       <footer className="relative z-10 border-t border-slate-200 bg-white/80 backdrop-blur-md py-8 px-6 mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-center md:text-left">
-            <p className="text-slate-900 font-semibold mb-1">APEX AI ASSISTANT</p>
+            <p className="text-slate-900 font-semibold mb-1">Apex HR</p>
             <p className="text-sm text-slate-500">Developed by Mohamed Atheeq</p>
           </div>
           
@@ -175,7 +175,7 @@ export default function LandingPage() {
           </div>
           
           <div className="text-sm text-slate-500 text-center md:text-right">
-            © 2026 APEX AI ASSISTANT.<br className="hidden md:block" /> All rights reserved.
+            © 2026 Apex HR.<br className="hidden md:block" /> All rights reserved.
           </div>
         </div>
       </footer>
