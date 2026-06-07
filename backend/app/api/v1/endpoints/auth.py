@@ -123,7 +123,11 @@ def get_my_profile(current_user: User = Depends(get_current_user)):
         "full_name": current_user.full_name,
         "role": current_user.role,
         "annual_leave_balance": current_user.annual_leave_balance,
-        "sick_leave_balance": current_user.sick_leave_balance
+        "sick_leave_balance": current_user.sick_leave_balance,
+        "maternity_leave_balance": current_user.maternity_leave_balance,
+        "paternity_leave_balance": current_user.paternity_leave_balance,
+        "bereavement_leave_balance": current_user.bereavement_leave_balance,
+        "unpaid_leave_balance": current_user.unpaid_leave_balance,
     }
 
 # unlock the user (admin only)

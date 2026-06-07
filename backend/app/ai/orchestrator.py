@@ -199,6 +199,7 @@ async def _run_agent_loop(
                     ToolMessage(content=result, tool_call_id=tc["id"])
                 )
             except Exception as exc:
+                print(f"  [Tool ERROR] '{tc['name']}' raised: {exc}")
                 tool_messages.append(
                     ToolMessage(content=f"Error: {exc}", tool_call_id=tc["id"])
                 )
