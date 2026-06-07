@@ -35,21 +35,16 @@ HR_DEPARTMENT_EMAIL = settings.HR_DEPARTMENT_EMAIL
 
  
 # Gmail helper  (personal only – system SMTP is inline where needed) 
-def get_gmail_service(user):
+def get_gmail_service(user_id: str, access_token_enc: str | None, refresh_token_enc: str):
     """
-    Build and return an authenticated Gmail API service for *user*.
+    Build and return an authenticated Gmail API service.
+    Accepts plain string scalars so it is safe to call from tool closures
+    where the original ORM session may already be closed.
     Refreshes the access token when expired and persists the new token.
-    Raises if the user has not linked their Google account.
     """
-    if not user or not user.google_refresh_token:
-        raise Exception(
-            f"User {user.email} has not linked their Google account. "
-            "Please connect Gmail first."
-        )
-
     creds = Credentials(
-        token=decrypt_token(user.google_access_token),
-        refresh_token=decrypt_token(user.google_refresh_token),
+        token=decrypt_token(access_token_enc) if access_token_enc else None,
+        refresh_token=decrypt_token(refresh_token_enc),
         token_uri="https://oauth2.googleapis.com/token",
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
@@ -58,9 +53,10 @@ def get_gmail_service(user):
 
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
+        import uuid
         db = SessionLocal()
         try:
-            db_user = db.query(User).filter(User.id == user.id).first()
+            db_user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
             if db_user:
                 db_user.google_access_token = encrypt_token(creds.token)
                 db.commit()
@@ -80,9 +76,21 @@ def make_tools_for_user(user):
         leave_llm = base_llm.bind_tools(list(tools["leave"].values()))
 
     Each call produces fresh closures so concurrent requests never share state.
+    IMPORTANT: We snapshot all ORM attributes into plain Python primitives HERE,
+    while the FastAPI request session is still alive. Closures capture these
+    primitives — never the ORM object — to avoid DetachedInstanceError when
+    LangGraph calls the tools after the request session has closed.
     """
+    # ── Snapshot user attributes as plain Python scalars ──────────────────
+    user_id             = str(user.id)
+    user_role           = str(user.role)
+    user_email          = str(user.email)
+    user_full_name      = str(user.full_name or "")
+    user_google_refresh = user.google_refresh_token  
+    user_google_access  = user.google_access_token
+    # ──────────────────────────────────────────────────────────────────────
 
-  #  Individual tool implementations (closures over `user`)                
+  #  Individual tool implementations (closures over plain scalars)         
 
     @tool
     def get_current_date() -> str:
@@ -94,9 +102,9 @@ def make_tools_for_user(user):
     @tool
     def check_sql_leave_balance(employee_id: str = "") -> str:
         """Check annual leave and sick leave balance, name, and email for a given employee ID. Leave empty to check your own balance."""
-        employee_id = employee_id.strip(' "\'') if employee_id else str(user.id)
+        employee_id = employee_id.strip(' "\'') if employee_id else user_id
 
-        if str(user.id) != employee_id and user.role not in ("hr", "admin"):
+        if user_id != employee_id and user_role not in ("hr", "admin"):
             return "ERROR: You do not have permission to view another employee's leave balance."
 
         import uuid
@@ -138,7 +146,7 @@ def make_tools_for_user(user):
     @tool
     def hr_vector_search(query: str) -> str:
         """Search HR policy documents using semantic vector search."""
-        return retrieve_docs(query, user_role=user.role)
+        return retrieve_docs(query, user_role=user_role)
 
     @tool
     def apply_leave_tool(
@@ -191,7 +199,7 @@ def make_tools_for_user(user):
 
         db = SessionLocal()
         try:
-            if send_email and not user.google_refresh_token:
+            if send_email and not user_google_refresh:
                 return "Failed: GOOGLE_AUTH_REQUIRED. You must connect your Gmail to submit this request."
 
             leave_data = LeaveCreate(
@@ -201,11 +209,11 @@ def make_tools_for_user(user):
                 reason=reason,
             )
             # Apply leave but do not commit yet (hold transaction)
-            leave = leave_service.apply_leave(db, user_id=user.id, leave_in=leave_data, commit=False)
+            leave = leave_service.apply_leave(db, user_id=user_id, leave_in=leave_data, commit=False)
             
             if send_email:
                 try:
-                    service = get_gmail_service(user)
+                    service = get_gmail_service(user_id, user_google_access, user_google_refresh)
                     message = EmailMessage()
                     message.set_content(body)
                     message["To"] = recipient
@@ -239,7 +247,7 @@ def make_tools_for_user(user):
             recipient: str, subject: str, body: str, is_confirmed: bool = False
     ) -> str:
         """Draft and send an email using the user's personal Gmail account."""
-        if not user.google_refresh_token:
+        if not user_google_refresh:
             return (
                 "GOOGLE_AUTH_REQUIRED "
                 "Tell the user: 'You need to connect your Gmail to send requests. "
@@ -253,7 +261,7 @@ def make_tools_for_user(user):
             )
 
         try:
-            service = get_gmail_service(user)
+            service = get_gmail_service(user_id, user_google_access, user_google_refresh)
             message = EmailMessage()
             message.set_content(body)
             message["To"] = recipient
@@ -281,7 +289,7 @@ def make_tools_for_user(user):
         Email is attempted first so a delivery failure never creates a silent
         orphan record in the database.
         """
-        if not is_anonymous and not user.google_refresh_token:
+        if not is_anonymous and not user_google_refresh:
             return (
                 "GOOGLE_AUTH_REQUIRED "
                 "Tell the user they must connect their Google account to submit "
@@ -294,9 +302,9 @@ def make_tools_for_user(user):
             subject_prefix = "Anonymous"
             contact_info = f"Anonymous Contact Email: {safe_contact_email}"
         else:
-            sender_display = f"{user.full_name} (ID: {user.id}, Email: {user.email})"
+            sender_display = f"{user_full_name} (ID: {user_id}, Email: {user_email})"
             subject_prefix = "Formal"
-            contact_info = f"Employee Corporate Email: {user.email}"
+            contact_info = f"Employee Corporate Email: {user_email}"
 
         body = (
             f"--- {subject_prefix} Workplace Complaint ---\n\n"
@@ -320,7 +328,7 @@ def make_tools_for_user(user):
                     server.login(SYSTEM_EMAIL_ADDRESS, SYSTEM_EMAIL_APP_PASSWORD)
                     server.send_message(message)
             else:
-                service = get_gmail_service(user)
+                service = get_gmail_service(user_id, user_google_access, user_google_refresh)
                 message = EmailMessage()
                 message.set_content(body)
                 message["To"] = HR_DEPARTMENT_EMAIL
@@ -347,7 +355,7 @@ def make_tools_for_user(user):
                 is_anonymous=is_anonymous,
             )
             complaint = complaint_service.create_complaint(
-                db, user_id=user.id, data=complaint_data
+                db, user_id=user_id, data=complaint_data
             )
             print(f"COMPLAINT SAVED TO DB: {complaint.id}")
             print("EMAIL SENT TO HR")
