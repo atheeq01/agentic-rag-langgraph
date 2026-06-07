@@ -270,9 +270,14 @@ MULTI-REQUEST HANDLING:
 1. TASKS:
 - CHECK BALANCES:
   - Use `check_sql_leave_balance`
-  - Inform the user about:
-    - Annual Leave Balance (20 days/year)
-    - Sick Leave Balance (10 days/year)
+  - ALWAYS call the tool — NEVER guess or quote policy numbers.
+  - Report ALL six leave balances from the tool result:
+    - Annual Leave Balance
+    - Sick Leave Balance
+    - Maternity Leave Balance
+    - Paternity Leave Balance
+    - Bereavement Leave Balance
+    - Unpaid Family Leave Balance
 
 - DATE LOOKUP:
   - Use `get_current_date` for resolving relative dates.

@@ -68,6 +68,9 @@ def semantic_router(state):
             "leave request",
             "annual leave",
             "sick leave",
+            "gmail connected",
+            "submit my leave",
+            "proceed and submit",
         ]
         if any(kw in last_ai_lower for kw in leave_continuation_signals):
             print("[Router] Continuation → LEAVE_AGENT")
@@ -77,9 +80,25 @@ def semantic_router(state):
     common_utility_keywords = [
         "balance",
         "how many leaves",
+        "how many days",
         "remaining",
         "status",
         "check my",
+        "how much leave",
+        "leave left",
+        "days left",
+        "leave remaining",
+        "leave available",
+        "days remaining",
+        "days available",
+        "leave i have",
+        "what is my leave",
+        "how many annual",
+        "how many sick",
+        "my leave balance",
+        "my annual",
+        "my sick",
+        "entitlement",
     ]
     if any(kw in user_text_lower for kw in common_utility_keywords):
         print("[Router] Utility → COMMON_AGENT")

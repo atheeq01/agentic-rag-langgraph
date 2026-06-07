@@ -67,9 +67,9 @@ export default function AIChatPage() {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "GOOGLE_AUTH_SUCCESS") {
         console.log("Gmail connected successfully!");
-        if (lastUserMessageRef.current) {
-          chatMutation.mutate(lastUserMessageRef.current);
-        }
+        // Send a specific resume message so the router recognises this as a
+        // leave-agent continuation (not a generic "yes" that falls to HR_AGENT)
+        chatMutation.mutate("Gmail connected. Please proceed and submit my leave request now.");
       }
     };
 

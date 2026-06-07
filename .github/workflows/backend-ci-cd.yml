@@ -14,6 +14,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  actions: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -111,9 +112,31 @@ jobs:
           echo -n "$FULL_CALLBACK_URL" | gcloud secrets versions add GOOGLE_REDIRECT_URI --data-file=- --project ${{ vars.GCP_PROJECT_ID }} --quiet
 
       - name: Print deployed URL
+        id: get_url
         run: |
           URL=$(gcloud run services describe my-hr-backend \
             --region ${{ vars.GCP_REGION }} \
             --project ${{ vars.GCP_PROJECT_ID }} \
             --format='value(status.url)')
           echo "✅ Backend deployed to: $URL"
+          echo "backend_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Update VITE_API_URL GitHub Secret
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_URL: ${{ steps.get_url.outputs.backend_url }}
+        run: |
+          # Encrypt and update the VITE_API_URL repository secret via GitHub API
+          # so the next frontend build always uses the correct backend URL.
+          gh secret set VITE_API_URL --body "$BACKEND_URL" --repo ${{ github.repository }}
+          echo "✅ VITE_API_URL secret updated to: $BACKEND_URL"
+
+      - name: Trigger Frontend Redeploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Kick off the frontend workflow so it rebuilds with the new VITE_API_URL.
+          gh workflow run frontend-ci-cd.yml \
+            --repo ${{ github.repository }} \
+            --ref main
+          echo "✅ Frontend redeploy triggered"
