@@ -282,7 +282,7 @@ def make_tools_for_user(user):
             accused_person: str,
             is_anonymous: bool,
             department: str = "General",
-            safe_contact_email: str = "None provided",
+            contact_email: str = "None provided",
     ) -> str:
         """
         Submits a formal complaint: sends notification email then saves to DB.
@@ -300,7 +300,7 @@ def make_tools_for_user(user):
         if is_anonymous:
             sender_display = "ANONYMOUS EMPLOYEE"
             subject_prefix = "Anonymous"
-            contact_info = f"Anonymous Contact Email: {safe_contact_email}"
+            contact_info = f"Anonymous Contact Email: {contact_email}"
         else:
             sender_display = f"{user_full_name} (ID: {user_id}, Email: {user_email})"
             subject_prefix = "Formal"

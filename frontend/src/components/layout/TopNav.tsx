@@ -1,4 +1,4 @@
-import { Bell, MessageSquare, Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 import { useUIStore, useAuthStore } from '@/store/useStore';
 
 export default function TopNav() {
@@ -28,17 +28,7 @@ export default function TopNav() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4 ml-auto">
-        <div className="hidden sm:flex items-center gap-2">
-            <button className="p-2.5 rounded-xl hover:bg-white/60 transition-all relative group">
-              <Bell className="w-5 h-5 text-foreground/60 group-hover:text-primary" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full ring-2 ring-white"></span>
-            </button>
-            <button className="p-2.5 rounded-xl hover:bg-white/60 transition-all group">
-              <MessageSquare className="w-5 h-5 text-foreground/60 group-hover:text-primary" />
-            </button>
-        </div>
-        
-        <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-white/40">
+        <div className="flex items-center gap-3 pl-2 sm:pl-4">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/80 to-purple-400 flex items-center justify-center text-white font-bold text-xs shadow-sm">
             {initials}
           </div>

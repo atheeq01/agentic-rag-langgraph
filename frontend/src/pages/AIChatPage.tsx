@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, User, Send, Paperclip, CheckCircle2, Loader2, Plus, MessageSquare, X, ExternalLink } from 'lucide-react';
+import { Bot, User, Send, CheckCircle2, Loader2, Plus, MessageSquare, X, ExternalLink } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
 
 type Message = { id: string; role: 'user' | 'agent'; content: string; timestamp: string; citations?: string[]; authUrl?: string; requiresGoogleAuth?: boolean };
 
@@ -23,6 +24,7 @@ export default function AIChatPage() {
   const [pendingAuthUrl, setPendingAuthUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastUserMessageRef = useRef<string>("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
 
   // Responsive State Tracker
@@ -188,6 +190,9 @@ export default function AIChatPage() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }]);
     setInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     chatMutation.mutate(userMsgContent);
   };
 
@@ -384,7 +389,13 @@ export default function AIChatPage() {
                         : 'bg-white border border-white/60 rounded-[2rem] rounded-tl-sm text-slate-800'
                     )}
                   >
-                    <p className="text-sm md:text-base leading-relaxed font-medium whitespace-pre-wrap">{msg.content}</p>
+                    <div className={cn(
+                      "text-sm md:text-base leading-relaxed font-medium prose prose-sm max-w-none break-words",
+                      msg.role === 'user' ? 'prose-invert text-white' : 'prose-slate text-slate-800',
+                      "prose-p:leading-relaxed prose-pre:bg-slate-800 prose-pre:text-slate-50"
+                    )}>
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
 
                     {/* Google Auth Connect Button */}
                     {(msg.authUrl || msg.requiresGoogleAuth) && (
@@ -444,23 +455,31 @@ export default function AIChatPage() {
 
         {/* Input Area */}
         <div className="p-4 md:p-6 bg-white/40 border-t border-white/20 backdrop-blur-xl z-20">
-          <div className="relative flex items-center max-w-4xl mx-auto w-full group">
-            <button className="absolute left-4 p-2 text-slate-400 hover:text-primary transition-colors bg-white/80 rounded-xl shadow-sm border border-white/40">
-              <Paperclip className="w-4 h-4" />
-            </button>
-            <input
-              type="text"
+          <div className="relative flex items-end max-w-4xl mx-auto w-full group">
+            <textarea
+              ref={textareaRef}
+              rows={1}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              onChange={(e) => {
+                setInput(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
               disabled={chatMutation.isPending}
               placeholder="Query HR knowledge base..."
-              className="w-full bg-white/80 border border-white shadow-2xl focus:border-primary/40 focus:ring-4 focus:ring-primary/5 transition-all rounded-[1.5rem] pl-16 pr-16 py-4 md:py-5 text-sm md:text-base font-bold outline-none disabled:opacity-50 placeholder:text-slate-300"
+              className="w-full bg-white/80 border border-white shadow-2xl focus:border-primary/40 focus:ring-4 focus:ring-primary/5 transition-all rounded-[1.5rem] pl-6 pr-16 py-4 md:py-5 text-sm md:text-base font-bold outline-none disabled:opacity-50 placeholder:text-slate-300 resize-none custom-scrollbar"
+              style={{ minHeight: '56px', maxHeight: '200px' }}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || chatMutation.isPending}
-              className="absolute right-3 p-3.5 bg-primary text-white rounded-2xl hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-50 transition-all shadow-xl shadow-primary/20"
+              className="absolute right-3 bottom-2 md:bottom-2.5 p-3.5 bg-primary text-white rounded-2xl hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-50 transition-all shadow-xl shadow-primary/20"
             >
               <Send className="w-4 h-4 md:w-5 md:h-5 ml-0.5" />
             </button>

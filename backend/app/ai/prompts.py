@@ -141,7 +141,7 @@ Collect the following:
    - Technical
    - If the department is outside the supported categories, ask the user to choose the closest valid department.
 5. Anonymity Preference
-6. Safe Contact Email (ONLY if anonymous)
+6. contact_email (ONLY if anonymous)
    - User may also say "skip"
 
 2. PREVIEW & ANONYMITY LOGIC:
