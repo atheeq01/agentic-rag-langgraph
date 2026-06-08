@@ -1,11 +1,55 @@
+import * as React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Calendar, Clock, CheckCircle2, Loader2, AlertCircle, MessageSquare, ChevronDown
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm, FormProvider, useFormContext, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+
+const formSchema = z.object({
+  leaveType: z.string().min(1, "Leave type is required."),
+  startDate: z.string().refine((val) => val !== "" && !isNaN(Date.parse(val)), {
+    message: "Start date is required.",
+  }),
+  endDate: z.string().refine((val) => val !== "" && !isNaN(Date.parse(val)), {
+    message: "End date is required.",
+  }),
+  reason: z.string().max(500, "Reason must be at most 500 characters.").optional(),
+}).superRefine((data, ctx) => {
+  if (data.leaveType === "Annual" && data.startDate) {
+    const start = new Date(data.startDate);
+    start.setHours(0,0,0,0);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const diffDays = Math.ceil((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 14) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Annual leave requires 14 days advance notice.",
+        path: ["startDate"],
+      });
+    }
+  }
+
+  if (data.startDate && data.endDate) {
+    const start = new Date(data.startDate);
+    const end = new Date(data.endDate);
+    if (end <= start) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End date must be after start date.",
+        path: ["endDate"],
+      });
+    }
+  }
+});
 
 interface Leave {
   id: string;
@@ -27,14 +71,17 @@ interface UserProfile {
 
 export default function MyLeavesPage() {
   const [activeTab, setActiveTab] = useState<'file' | 'history' | 'policy'>('file');
-  const [formData, setFormData] = useState({ 
-    start_date: '', 
-    end_date: '', 
-    leave_type: 'Annual', 
-    reason: '' 
-  });
-  const [errorMsg, setErrorMsg] = useState('');
   const queryClient = useQueryClient();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      leaveType: 'Annual',
+      startDate: '',
+      endDate: '',
+      reason: ''
+    },
+  });
 
   const { data: userProfile } = useQuery<UserProfile>({ 
     queryKey: ['auth', 'me'], 
@@ -52,58 +99,33 @@ export default function MyLeavesPage() {
   });
 
   const fileMutation = useMutation({
-    mutationFn: (data: typeof formData) => api.post('/leaves/', {
-      start_date: data.start_date,
-      end_date: data.end_date,
-      leave_type: data.leave_type,
-      reason: data.reason
-    }),
+    mutationFn: (data: { start_date: string; end_date: string; leave_type: string; reason: string }) => api.post('/leaves/', data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['leaves', 'me'] });
       setActiveTab('history');
-      setFormData({ start_date: '', end_date: '', leave_type: 'Annual', reason: '' });
-      setErrorMsg('');
+      form.reset();
+      toast.success("Leave request submitted successfully!");
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.detail || 'Failed to apply for leave.');
+      toast.error(err.response?.data?.detail || 'Failed to apply for leave.');
     }
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.start_date || !formData.end_date || !formData.reason.trim()) {
-      setErrorMsg('All fields are required.');
-      return;
-    }
-
-    const duration = calculateDuration(formData.start_date, formData.end_date);
-    const daysInAdvance = Math.ceil((new Date(formData.start_date).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
-
-    if (formData.leave_type === 'Annual' && daysInAdvance < 14) {
-      setErrorMsg(`Annual leaves must be submitted at least 14 days in advance.`);
-      return;
-    }
-
-    fileMutation.mutate(formData);
+  const onSubmit = (data: z.infer<typeof formSchema>) => {
+    fileMutation.mutate({
+      start_date: data.startDate,
+      end_date: data.endDate,
+      leave_type: data.leaveType,
+      reason: data.reason || ""
+    });
   };
 
-  const calculateDuration = (start: string, end: string) => {
-    if (!start || !end) return 0;
-    const diffTime = Math.abs(new Date(end).getTime() - new Date(start).getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
-  };
-
-  const duration = calculateDuration(formData.start_date, formData.end_date);
-  
-  const daysInAdvance = formData.start_date
-    ? Math.ceil((new Date(formData.start_date).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24))
-    : 0;
-
-  const showAdvanceWarning = duration > 3 && daysInAdvance < 14;
+  const selectedLeaveType = form.watch("leaveType");
+  const selectedStartDate = form.watch("startDate");
 
   const getMinStartDate = () => {
     const minDate = new Date();
-    if (formData.leave_type === 'Annual') {
+    if (selectedLeaveType === 'Annual') {
       minDate.setDate(minDate.getDate() + 14); 
     }
     return minDate.toISOString().split("T")[0];
@@ -208,68 +230,112 @@ export default function MyLeavesPage() {
         {activeTab === 'file' ? (
           <motion.div key="file" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-panel p-8 md:p-10 border border-white/40 shadow-2xl bg-white/30 backdrop-blur-md rounded-3xl">
             <h2 className="text-xl font-bold mb-8 text-slate-900 uppercase tracking-tight">Request Time Off</h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {errorMsg && (
-                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700 text-xs font-bold">
-                  <AlertCircle className="w-4 h-4" /> {errorMsg}
-                </div>
-              )}
-
-              <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3 text-amber-800 text-[11px] font-bold leading-relaxed shadow-sm">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <div>
-                  <span className="uppercase tracking-wider">Policy Notice:</span> Annual leaves must be submitted at least 14 days in advance. Sick leaves exceeding 3 days require a doctor's certificate upon return.
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Start Date</label>
-                  <div className="relative">
-                    <input 
-                      type="date" 
-                      min={getMinStartDate()}
-                      value={formData.start_date} 
-                      onChange={e => setFormData({...formData, start_date: e.target.value})}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/5 transition-all appearance-none" 
-                      required 
-                    />
-                    <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-6">
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3 text-amber-800 text-[11px] font-bold leading-relaxed shadow-sm">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="uppercase tracking-wider">Policy Notice:</span> Annual leaves must be submitted at least 14 days in advance. Sick leaves exceeding 3 days require a doctor's certificate upon return.
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">End Date</label>
-                  <div className="relative">
-                    <input 
-                      type="date" 
-                      min={formData.start_date || new Date().toISOString().split("T")[0]}
-                      value={formData.end_date} 
-                      onChange={e => setFormData({...formData, end_date: e.target.value})}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/5 transition-all appearance-none" 
-                      required 
-                    />
-                    <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                  </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    name="startDate"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Start Date</label>
+                        <FormControl>
+                          <div className="relative">
+                            <input 
+                              type="date" 
+                              min={getMinStartDate()}
+                              {...field}
+                              className={cn(
+                                "w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/5 transition-all appearance-none",
+                                form.formState.errors.startDate && "border-red-500 focus:ring-red-500/20"
+                              )} 
+                            />
+                            <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    name="endDate"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">End Date</label>
+                        <FormControl>
+                          <div className="relative">
+                            <input 
+                              type="date" 
+                              min={selectedStartDate || new Date().toISOString().split("T")[0]}
+                              {...field}
+                              className={cn(
+                                "w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/5 transition-all appearance-none",
+                                form.formState.errors.endDate && "border-red-500 focus:ring-red-500/20"
+                              )} 
+                            />
+                            <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-              </div>
 
-              <BeautifulSelect 
-                label="Leave Type"
-                value={formData.leave_type}
-                options={leaveOptions}
-                onChange={(val: string) => setFormData({...formData, leave_type: val})}
-              />
+                <FormField
+                  name="leaveType"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <BeautifulSelect 
+                          label="Leave Type"
+                          value={field.value}
+                          options={leaveOptions}
+                          onChange={(val: string) => field.onChange(val)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Reason</label>
-                <textarea rows={4} value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-bold outline-none resize-none focus:ring-4 focus:ring-primary/5 transition-all" placeholder="Provide a brief reason for your leave..." required />
-              </div>
+                <FormField
+                  name="reason"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Reason</label>
+                      <FormControl>
+                        <textarea 
+                          rows={4} 
+                          {...field} 
+                          className={cn(
+                            "w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-bold outline-none resize-none focus:ring-4 focus:ring-primary/5 transition-all",
+                            form.formState.errors.reason && "border-red-500 focus:ring-red-500/20"
+                          )} 
+                          placeholder="Provide a brief reason for your leave..." 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <button type="submit" disabled={fileMutation.isPending} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex justify-center items-center gap-2 shadow-xl hover:bg-slate-800 transition-all active:scale-[0.98] disabled:opacity-70">
-                {fileMutation.isPending ? <Loader2 className="animate-spin w-5 h-5" /> : <Calendar className="w-5 h-5" />}
-                {fileMutation.isPending ? 'Submitting...' : 'Submit Request'}
-              </button>
-            </form>
+                <button type="submit" disabled={fileMutation.isPending} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex justify-center items-center gap-2 shadow-xl hover:bg-slate-800 transition-all active:scale-[0.98] disabled:opacity-70">
+                  {fileMutation.isPending ? <Loader2 className="animate-spin w-5 h-5" /> : <Calendar className="w-5 h-5" />}
+                  {fileMutation.isPending ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </form>
+            </Form>
           </motion.div>
         ) : activeTab === 'history' ? (
           <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-panel overflow-hidden border border-white/40 shadow-2xl bg-white/30 backdrop-blur-md rounded-3xl">
@@ -410,3 +476,59 @@ function BeautifulSelect({ label, value, options, onChange }: any) {
     </div>
   );
 }
+
+const Form = FormProvider;
+
+const FormFieldContext = React.createContext<{ name: string }>({ name: "" });
+
+const FormField = ({ name, render }: any) => {
+  const { control } = useFormContext();
+  return (
+    <FormFieldContext.Provider value={{ name }}>
+      <Controller name={name} control={control} render={render} />
+    </FormFieldContext.Provider>
+  );
+};
+
+const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("space-y-2", className)} {...props} />
+  )
+);
+FormItem.displayName = "FormItem";
+
+const FormControl = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ ...props }, ref) => (
+    <div ref={ref} className="relative w-full" {...props} />
+  )
+);
+FormControl.displayName = "FormControl";
+
+const FormMessage = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
+  ({ className, children, ...props }, ref) => {
+    const { name } = React.useContext(FormFieldContext);
+    const { formState: { errors } } = useFormContext();
+    const error = errors[name];
+    const body = error ? String(error?.message) : children;
+
+    if (!body) {
+      return null;
+    }
+
+    return (
+      <AnimatePresence>
+        <motion.p
+          ref={ref}
+          initial={{ opacity: 0, height: 0, marginTop: 0 }}
+          animate={{ opacity: 1, height: "auto", marginTop: 8 }}
+          exit={{ opacity: 0, height: 0, marginTop: 0 }}
+          className={cn("text-[11px] font-bold text-destructive text-red-500", className)}
+          {...props}
+        >
+          {body}
+        </motion.p>
+      </AnimatePresence>
+    );
+  }
+);
+FormMessage.displayName = "FormMessage";
