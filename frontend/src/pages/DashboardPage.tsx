@@ -19,6 +19,12 @@ export default function DashboardPage() {
     enabled: isManagerOrAbove(user)
   });
 
+  const { data: teamMembers, isLoading: loadingTeamMembers } = useQuery({
+    queryKey: ['users', 'team'],
+    queryFn: () => api.get('/users/').then(res => res.data),
+    enabled: isManagerOrAbove(user)
+  });
+
   const { data: myComplaints, isLoading: loadingComplaints } = useQuery({
     queryKey: ['complaints', 'me'],
     queryFn: () => api.get('/complaints/me').then(res => res.data)
@@ -203,6 +209,43 @@ export default function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Team Members List — Manager/HR/Admin */}
+        {isManagerOrAbove(user) && (
+          <div className="glass-panel overflow-hidden border border-white/40 flex flex-col">
+            <div className="p-5 border-b border-white/20 bg-white/30 flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">MY TEAM MEMBERS</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar max-h-[320px]">
+              {loadingTeamMembers ? (
+                 <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+              ) : teamMembers?.length === 0 ? (
+                 <div className="py-12 text-center text-muted-foreground font-medium uppercase tracking-widest text-[10px]">No team members found</div>
+              ) : (
+                <div className="divide-y divide-white/10">
+                  {teamMembers?.map((member: any) => (
+                    <div key={member.id} className="p-4 hover:bg-white/40 transition-colors flex items-center justify-between group">
+                       <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center text-xs font-black text-indigo-600">
+                           {(member.full_name || member.email || '').substring(0, 2).toUpperCase()}
+                         </div>
+                         <div>
+                           <p className="font-bold text-sm text-slate-800 leading-tight">{member.full_name || 'Unknown'}</p>
+                           <p className="text-[10px] text-slate-500 font-bold tracking-wide mt-0.5">{member.email}</p>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <span className="inline-block px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                           {member.department || 'General'}
+                         </span>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
