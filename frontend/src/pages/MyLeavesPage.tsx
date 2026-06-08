@@ -41,10 +41,10 @@ const formSchema = z.object({
   if (data.startDate && data.endDate) {
     const start = new Date(data.startDate);
     const end = new Date(data.endDate);
-    if (end <= start) {
+    if (end < start) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "End date must be after start date.",
+        message: "End date must be on or after start date.",
         path: ["endDate"],
       });
     }
@@ -112,6 +112,27 @@ export default function MyLeavesPage() {
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
+    if (userProfile) {
+      const start = new Date(data.startDate);
+      const end = new Date(data.endDate);
+      const duration = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      const typeLower = data.leaveType.toLowerCase();
+      let balance = 0;
+      
+      if (typeLower === 'annual') balance = userProfile.annual_leave_balance;
+      else if (typeLower === 'sick') balance = userProfile.sick_leave_balance;
+      else if (typeLower === 'maternity') balance = userProfile.maternity_leave_balance;
+      else if (typeLower === 'paternity') balance = userProfile.paternity_leave_balance;
+      else if (typeLower === 'bereavement') balance = userProfile.bereavement_leave_balance;
+      else if (typeLower === 'unpaid family') balance = userProfile.unpaid_leave_balance;
+
+      if (duration > balance) {
+        form.setError('leaveType', { type: 'manual', message: `Insufficient balance. You only have ${balance} days left.` });
+        return;
+      }
+    }
+
     fileMutation.mutate({
       start_date: data.startDate,
       end_date: data.endDate,

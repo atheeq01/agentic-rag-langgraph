@@ -32,9 +32,12 @@ function RoleGate({ roles, children }: { roles: UserRole[]; children: React.Reac
   return <>{children}</>;
 }
 
+import { Toaster } from 'sonner';
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <Toaster position="top-right" richColors />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
