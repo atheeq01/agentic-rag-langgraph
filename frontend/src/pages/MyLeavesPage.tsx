@@ -243,7 +243,7 @@ export default function MyLeavesPage() {
                   <FormField
                     name="startDate"
                     control={form.control}
-                    render={({ field }) => (
+                    render={({ field }: any) => (
                       <FormItem>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Start Date</label>
                         <FormControl>
@@ -267,7 +267,7 @@ export default function MyLeavesPage() {
                   <FormField
                     name="endDate"
                     control={form.control}
-                    render={({ field }) => (
+                    render={({ field }: any) => (
                       <FormItem>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">End Date</label>
                         <FormControl>
@@ -293,7 +293,7 @@ export default function MyLeavesPage() {
                 <FormField
                   name="leaveType"
                   control={form.control}
-                  render={({ field }) => (
+                  render={({ field }: any) => (
                     <FormItem>
                       <FormControl>
                         <BeautifulSelect 
@@ -311,7 +311,7 @@ export default function MyLeavesPage() {
                 <FormField
                   name="reason"
                   control={form.control}
-                  render={({ field }) => (
+                  render={({ field }: any) => (
                     <FormItem>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Reason</label>
                       <FormControl>
@@ -523,7 +523,7 @@ const FormMessage = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<
           animate={{ opacity: 1, height: "auto", marginTop: 8 }}
           exit={{ opacity: 0, height: 0, marginTop: 0 }}
           className={cn("text-[11px] font-bold text-destructive text-red-500", className)}
-          {...props}
+          {...(props as any)}
         >
           {body}
         </motion.p>
