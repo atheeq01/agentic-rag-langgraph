@@ -1,22 +1,25 @@
 import { useState } from 'react';
-import { CheckCircle2, Loader2, Flag, X, History, CalendarDays } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { Easing } from 'framer-motion';
+import { 
+  CheckCircle2, Loader2, Flag, X, History, CalendarDays 
+} from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { Modal } from '@/components/ui/Modal';
+
+const EASE: Easing = 'easeOut';
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.4, delay, ease: EASE },
+});
 
 interface TeamComplaint {
-  id: string;
-  user_id: string;
-  title: string;
-  department: string;
-  description: string;
-  status: string;
-  is_anonymous: boolean;
-  reporter_name?: string;
-  resolution_note?: string | null;
-  created_at: string;
-  resolved_at?: string;
-  resolved_by_name?: string;
+  id: string; user_id: string; title: string; department: string;
+  description: string; status: string; is_anonymous: boolean; priority: string;
+  reporter_name?: string; resolution_note?: string | null;
+  created_at: string; resolved_at?: string; resolved_by_name?: string;
 }
 
 export default function ManageComplaintsPage() {
@@ -49,83 +52,111 @@ export default function ManageComplaintsPage() {
     }
   };
 
-  // Helper function to format ISO dates to readable text
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A";
+  const fmt = (dateString?: string) => {
+    if (!dateString) return "—";
     return new Intl.DateTimeFormat('en-US', { 
       month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
     }).format(new Date(dateString));
   };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto relative">
-      <div className="px-1 flex flex-col gap-1">
-        <h1 className="text-3xl font-bold text-slate-900 leading-tight">Grievance Resolutions</h1>
-        <p className="text-slate-500">Review and resolve employee concerns.</p>
-      </div>
+    <div className="space-y-6 max-w-6xl mx-auto pb-10">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
+        <h1 className="text-xl font-bold text-foreground">Grievance Resolutions</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Review and resolve employee concerns.</p>
+      </motion.div>
 
-      {/* BLOCK 1: ACTIVE CASES */}
-      <div className="glass-panel overflow-hidden border border-white/40 shadow-xl rounded-3xl bg-white/30 backdrop-blur-md">
-        <div className="p-6 border-b border-white/20 flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-rose-50 text-rose-600">
-            <Flag className="w-6 h-6" />
+      {/* Active Cases */}
+      <motion.div {...fadeUp(0.05)} className="table-wrapper">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-600 flex items-center justify-center">
+              <Flag className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground leading-tight">Active Cases</h2>
+              <p className="text-xs text-muted-foreground">Requires resolution</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Active Cases</h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Requires resolution</p>
-          </div>
+          <span className="text-xs font-semibold text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
+            {pendingComplaints.length} active
+          </span>
         </div>
 
-        <div className="w-full overflow-x-auto custom-scrollbar">
-          <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-white/40 text-left border-b border-white/10">
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Reporter</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic hidden sm:table-cell">Subject</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Description</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic text-right">Action</th>
+              <tr className="bg-secondary/50">
+                <th className="table-header py-2.5 px-5 text-left">Reporter</th>
+                <th className="table-header py-2.5 px-5 text-left hidden sm:table-cell">Subject</th>
+                <th className="table-header py-2.5 px-5 text-left">Description</th>
+                <th className="table-header py-2.5 px-5 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody>
               {loadingTeam ? (
-                <tr><td colSpan={4} className="py-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary opacity-50" /></td></tr>
+                <tr><td colSpan={4} className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-primary mx-auto" /></td></tr>
               ) : pendingComplaints.length === 0 ? (
-                <tr><td colSpan={4} className="py-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">No active grievances</td></tr>
+                <tr><td colSpan={4} className="py-16 text-center">
+                  <CheckCircle2 className="w-8 h-8 mx-auto mb-3 text-muted-foreground opacity-30" />
+                  <p className="text-sm text-muted-foreground">No active grievances.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Excellent work environment!</p>
+                </td></tr>
               ) : (
                 pendingComplaints.map((comp) => (
-                  <tr key={comp.id} className="hover:bg-white/40 transition-colors align-top">
-                    <td className="py-4 px-4 md:px-6">
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className={cn("w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black", comp.is_anonymous ? "bg-slate-100 text-slate-400" : "bg-primary/10 text-primary")}>
+                  <tr key={comp.id} className="table-row align-top">
+                    <td className="py-4 px-5">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${comp.is_anonymous ? 'bg-secondary text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
                           {comp.is_anonymous ? "?" : (comp.reporter_name?.substring(0, 1) || "U")}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-700 text-sm leading-none mb-1">{comp.is_anonymous ? "Anonymous" : comp.reporter_name}</span>
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 italic">
-                            <CalendarDays className="w-3 h-3" />
-                            {formatDate(comp.created_at)}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground text-sm truncate">{comp.is_anonymous ? "Anonymous" : comp.reporter_name}</p>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                              <CalendarDays className="w-3 h-3" /> {fmt(comp.created_at)}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                              comp.priority === 'high' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' :
+                              comp.priority === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                              'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                            }`}>
+                              {comp.priority || 'medium'}
+                            </span>
                           </div>
-                          <span className="sm:hidden text-[10px] font-black text-slate-800 uppercase tracking-tight mt-2">{comp.title}</span>
+                          {/* Mobile only subject */}
+                          <div className="sm:hidden mt-2">
+                            <p className="text-xs font-semibold text-foreground truncate">{comp.title}</p>
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-4 md:px-6 font-black text-slate-800 text-[10px] uppercase tracking-tight hidden sm:table-cell mt-1">
-                      <div className="mt-2">{comp.title}</div>
+                    <td className="py-4 px-5 hidden sm:table-cell">
+                      <p className="font-semibold text-foreground">{comp.title}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">ID: {comp.id.substring(0, 8)}</p>
                     </td>
-                    <td className="py-4 px-4 md:px-6 w-full max-w-[200px] md:max-w-sm">
-                      <div className={cn("text-xs text-slate-600 leading-relaxed cursor-pointer transition-all mt-1", expandedId === comp.id ? "whitespace-pre-wrap" : "line-clamp-2")} onClick={() => setExpandedId(expandedId === comp.id ? null : comp.id)}>
+                    <td className="py-4 px-5">
+                      <div 
+                        className={`text-sm text-foreground cursor-pointer transition-all ${expandedId === comp.id ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
+                        onClick={() => setExpandedId(expandedId === comp.id ? null : comp.id)}
+                      >
                         {comp.description}
                       </div>
                       {(comp.description?.length || 0) > 60 && (
-                        <span className="inline-block cursor-pointer text-[9px] font-black text-rose-500 mt-1 uppercase tracking-tighter" onClick={() => setExpandedId(expandedId === comp.id ? null : comp.id)}>
-                          {expandedId === comp.id ? "Close Details" : "View Full Description"}
-                        </span>
+                        <button 
+                          className="text-xs text-primary font-medium mt-1 hover:underline focus:outline-none"
+                          onClick={() => setExpandedId(expandedId === comp.id ? null : comp.id)}
+                        >
+                          {expandedId === comp.id ? 'Show less' : 'Read more'}
+                        </button>
                       )}
                     </td>
-                    <td className="py-4 px-4 md:px-6 text-right">
-                      <button onClick={() => setResolveModal({ isOpen: true, id: comp.id })} className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 border border-emerald-100 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ml-auto shadow-sm active:scale-[0.98] transition-all mt-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Resolve</span>
+                    <td className="py-4 px-5 text-right">
+                      <button 
+                        onClick={() => setResolveModal({ isOpen: true, id: comp.id })} 
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-600 rounded-lg transition-colors text-xs font-semibold"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Resolve</span>
                       </button>
                     </td>
                   </tr>
@@ -134,68 +165,83 @@ export default function ManageComplaintsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </motion.div>
 
-      {/* BLOCK 2: RESOLVED HISTORY */}
-      <div className="glass-panel overflow-hidden border border-white/40 shadow-xl rounded-3xl bg-white/30 backdrop-blur-md mt-10">
-        <div className="p-6 border-b border-white/20 flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600">
-            <History className="w-6 h-6" />
+      {/* Resolved History */}
+      <motion.div {...fadeUp(0.1)} className="table-wrapper">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+            <History className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Resolved Cases</h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Historical records</p>
+            <h2 className="text-sm font-semibold text-foreground leading-tight">Resolved Cases</h2>
+            <p className="text-xs text-muted-foreground">Historical records</p>
           </div>
         </div>
 
-        <div className="w-full overflow-x-auto custom-scrollbar">
-          <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-white/40 text-left border-b border-white/10">
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Reporter</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic hidden sm:table-cell">Subject</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic min-w-[200px]">Resolution Note</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Timeline</th>
+              <tr className="bg-secondary/50">
+                <th className="table-header py-2.5 px-5 text-left">Reporter</th>
+                <th className="table-header py-2.5 px-5 text-left hidden sm:table-cell">Subject</th>
+                <th className="table-header py-2.5 px-5 text-left">Resolution Note</th>
+                <th className="table-header py-2.5 px-5 text-left">Timeline</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody>
               {loadingTeam ? (
-                <tr><td colSpan={4} className="py-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary opacity-50" /></td></tr>
+                <tr><td colSpan={4} className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-primary mx-auto" /></td></tr>
               ) : resolvedComplaints.length === 0 ? (
-                <tr><td colSpan={4} className="py-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">No resolved grievances</td></tr>
+                <tr><td colSpan={4} className="py-16 text-center">
+                  <History className="w-8 h-8 mx-auto mb-3 text-muted-foreground opacity-30" />
+                  <p className="text-sm text-muted-foreground">No resolved grievances yet.</p>
+                </td></tr>
               ) : (
                 resolvedComplaints.map((comp) => (
-                  <tr key={comp.id} className="hover:bg-white/40 transition-colors align-top opacity-80">
-                    <td className="py-4 px-4 md:px-6">
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className={cn("w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black", comp.is_anonymous ? "bg-slate-100 text-slate-400" : "bg-primary/10 text-primary")}>
+                  <tr key={comp.id} className="table-row align-top">
+                    <td className="py-4 px-5">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${comp.is_anonymous ? 'bg-secondary text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
                           {comp.is_anonymous ? "?" : (comp.reporter_name?.substring(0, 1) || "U")}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-700 text-sm leading-none mb-1">{comp.is_anonymous ? "Anonymous" : comp.reporter_name}</span>
-                          {!comp.is_anonymous && <span className="text-[10px] font-bold text-slate-400 italic">ID: {comp.id.substring(0, 8)}</span>}
-                          <span className="sm:hidden text-[10px] font-black text-slate-800 uppercase tracking-tight mt-2">{comp.title}</span>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground text-sm truncate">{comp.is_anonymous ? "Anonymous" : comp.reporter_name}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {!comp.is_anonymous && <span className="text-[11px] text-muted-foreground">ID: {comp.id.substring(0, 8)}</span>}
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                              comp.priority === 'high' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' :
+                              comp.priority === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                              'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                            }`}>
+                              {comp.priority || 'medium'}
+                            </span>
+                          </div>
+                          {/* Mobile only subject */}
+                          <div className="sm:hidden mt-2">
+                            <p className="text-xs font-semibold text-foreground truncate">{comp.title}</p>
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-4 md:px-6 font-black text-slate-800 text-[10px] uppercase tracking-tight hidden sm:table-cell mt-1">
-                      <div className="mt-2">{comp.title}</div>
-                      <div className="text-xs text-slate-500 mt-2 line-clamp-1">{comp.description}</div>
+                    <td className="py-4 px-5 hidden sm:table-cell">
+                      <p className="font-semibold text-foreground">{comp.title}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1 line-clamp-1">{comp.description}</p>
                     </td>
-                    <td className="py-4 px-4 md:px-6">
-                      <div className="text-xs text-emerald-700 bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 mt-1 whitespace-pre-wrap">
-                        {comp.resolution_note || <span className="italic opacity-50">No notes provided.</span>}
+                    <td className="py-4 px-5">
+                      <div className="text-xs text-emerald-800 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 p-3 rounded-xl border border-emerald-100 dark:border-emerald-500/20 whitespace-pre-wrap leading-relaxed">
+                        {comp.resolution_note || <span className="italic opacity-70">No notes provided.</span>}
                       </div>
                     </td>
-                    <td className="py-4 px-4 md:px-6">
-                      <div className="flex flex-col gap-2 mt-1 border-l-2 border-slate-200 pl-3">
+                    <td className="py-4 px-5">
+                      <div className="flex flex-col gap-2.5 border-l-2 border-secondary pl-3">
                         <div>
-                          <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Submitted</span>
-                          <span className="text-xs font-medium text-slate-600">{formatDate(comp.created_at)}</span>
+                          <p className="text-[10px] font-semibold text-muted-foreground">Submitted</p>
+                          <p className="text-xs font-medium text-foreground mt-0.5">{fmt(comp.created_at)}</p>
                         </div>
                         <div>
-                          <span className="block text-[9px] font-black text-emerald-500 uppercase tracking-widest">Resolved By {comp.resolved_by_name || 'Admin'}</span>
-                          <span className="text-xs font-medium text-slate-600">{formatDate(comp.resolved_at)}</span>
+                          <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-500">Resolved By {comp.resolved_by_name || 'Admin'}</p>
+                          <p className="text-xs font-medium text-foreground mt-0.5">{fmt(comp.resolved_at)}</p>
                         </div>
                       </div>
                     </td>
@@ -205,47 +251,42 @@ export default function ManageComplaintsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Resolution Modal Overlay */}
-      {resolveModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white/90 backdrop-blur-xl border border-white shadow-2xl rounded-3xl p-6 w-full max-w-lg animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-slate-800">Resolve Grievance</h3>
-              <button onClick={() => setResolveModal({ isOpen: false, id: null })} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Resolution Notes</label>
-                <textarea 
-                  value={resolutionNote}
-                  onChange={(e) => setResolutionNote(e.target.value)}
-                  placeholder="Detail how this grievance was addressed..."
-                  className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-sm min-h-[120px] focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
-                />
-              </div>
-              
-              <div className="flex gap-3 justify-end pt-4">
-                <button onClick={() => setResolveModal({ isOpen: false, id: null })} className="px-6 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors">
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleResolveSubmit}
-                  disabled={resolveMutation.isPending || !resolutionNote.trim()}
-                  className="px-6 py-3 rounded-xl text-sm font-bold bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                >
-                  {resolveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Submit Resolution
-                </button>
-              </div>
-            </div>
+      {/* Resolution Modal */}
+      <Modal
+        isOpen={resolveModal.isOpen}
+        onClose={() => setResolveModal({ isOpen: false, id: null })}
+        title="Resolve Grievance"
+        description="Detail how this grievance was addressed."
+        maxWidth="lg"
+      >
+        <div className="space-y-5">
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Resolution Notes</label>
+            <textarea 
+              value={resolutionNote}
+              onChange={(e) => setResolutionNote(e.target.value)}
+              placeholder="Detail how this grievance was addressed..."
+              className="input w-full min-h-[120px] resize-none"
+            />
+          </div>
+          
+          <div className="flex gap-3 justify-end pt-2">
+            <button onClick={() => setResolveModal({ isOpen: false, id: null })} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+              Cancel
+            </button>
+            <button 
+              onClick={handleResolveSubmit}
+              disabled={resolveMutation.isPending || !resolutionNote.trim()}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              {resolveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Submit Resolution
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

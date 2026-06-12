@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { Easing } from 'framer-motion';
 import { 
-  Plus, 
-  Flag, 
-  Clock, 
-  CheckCircle2, 
-  Loader2, 
-  AlertCircle,
-  MessageSquare
+  Plus, Flag, Loader2, AlertCircle, MessageSquare, 
+  CheckCircle2, Clock, ChevronDown, ArrowRight 
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/Select';
+
+const EASE: Easing = 'easeOut';
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.4, delay, ease: EASE },
+});
 
 interface Complaint {
   id: string;
@@ -19,16 +22,31 @@ interface Complaint {
   description: string;
   department: string;
   status: string;
+  priority: string;
+  created_at: string;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    resolved: 'badge-resolved', pending: 'badge-pending', open: 'badge-open'
+  };
+  const dot: Record<string, string> = {
+    resolved: 'bg-emerald-500', pending: 'bg-amber-500', open: 'bg-orange-500'
+  };
+  const s = status.toLowerCase();
+  return (
+    <span className={`badge ${map[s] ?? 'badge-open'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot[s] ?? 'bg-slate-400'}`} />
+      <span className="capitalize">{status}</span>
+    </span>
+  );
 }
 
 export default function MyComplaintsPage() {
   const [activeTab, setActiveTab] = useState<'file' | 'history'>('file');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ 
-    title: '', 
-    description: '', 
-    department: 'HR',
-    is_anonymous: false 
+    title: '', description: '', department: 'HR', is_anonymous: false, priority: 'medium'
   });
   const [errorMsg, setErrorMsg] = useState('');
   const queryClient = useQueryClient();
@@ -40,21 +58,17 @@ export default function MyComplaintsPage() {
 
   const fileMutation = useMutation({
     mutationFn: (data: typeof formData) => api.post('/complaints/', {
-      ...data,
-      priority: "medium",
-      against_user_id: null
+      ...data, against_user_id: null
     }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['complaints', 'me'] });
       setActiveTab('history');
-      setFormData({ title: '', description: '', department: 'HR', is_anonymous: false });
+      setFormData({ title: '', description: '', department: 'HR', is_anonymous: false, priority: 'medium' });
       setErrorMsg('');
     },
     onError: (err: any) => {
       const message = err.response?.data?.detail;
-      const displayError = Array.isArray(message) 
-        ? message.map((m: any) => m.msg).join(", ") 
-        : message;
+      const displayError = Array.isArray(message) ? message.map((m: any) => m.msg).join(", ") : message;
       setErrorMsg(displayError || 'Failed to submit grievance.');
     }
   });
@@ -68,191 +82,223 @@ export default function MyComplaintsPage() {
     fileMutation.mutate(formData);
   };
 
-  const StatusBadge = ({ status }: { status: string }) => {
-    const styles: Record<string, string> = {
-      resolved: "bg-emerald-50 text-emerald-700 border-emerald-100",
-      pending: "bg-amber-50 text-amber-700 border-amber-100"
-    };
-    
-    return (
-      <span className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border",
-        styles[status] || styles.pending
-      )}>
-        {status === 'resolved' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-        {status}
-      </span>
-    );
+  const fmt = (dateString?: string) => {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
+  const tabs = [
+    { id: 'file' as const,    label: 'File New', icon: Plus },
+    { id: 'history' as const, label: 'My Cases', icon: MessageSquare },
+  ];
+
   return (
-    <div className="space-y-6 md:space-y-8 max-w-5xl mx-auto">
-      <div className="flex flex-col gap-1 px-1">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 leading-tight">Grievance Portal</h1>
-        <p className="text-sm md:text-base text-slate-500">Submit and track your complaints or suggestions securely.</p>
-      </div>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Header */}
+      <motion.div {...fadeUp()}>
+        <h1 className="text-xl font-bold text-foreground">Grievance Portal</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Submit and track your complaints or suggestions securely.</p>
+      </motion.div>
 
-      <div className="flex gap-1 p-1 bg-white/40 backdrop-blur-md border border-white/20 rounded-2xl w-fit max-w-full overflow-x-auto no-scrollbar">
-        <button 
-          onClick={() => setActiveTab('file')} 
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all duration-300 text-xs md:text-sm font-bold whitespace-nowrap uppercase tracking-widest",
-            activeTab === 'file' ? "bg-white text-primary shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-900 hover:bg-white/40"
-          )}
-        >
-          <Plus className="w-4 h-4" /> File New
-        </button>
-        <button 
-          onClick={() => setActiveTab('history')} 
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all duration-300 text-xs md:text-sm font-bold whitespace-nowrap uppercase tracking-widest",
-            activeTab === 'history' ? "bg-white text-primary shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-900 hover:bg-white/40"
-          )}
-        >
-          <MessageSquare className="w-4 h-4" /> My Cases
-        </button>
-      </div>
+      {/* Tab bar */}
+      <motion.div {...fadeUp(0.05)} className="flex gap-1 p-1 bg-secondary rounded-xl w-fit">
+        {tabs.map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === t.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{t.label}</span>
+            </button>
+          );
+        })}
+      </motion.div>
 
+      {/* Content */}
       <AnimatePresence mode="wait">
-        {activeTab === 'file' ? (
-          <motion.div 
-            key="file" 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, y: -10 }} 
-            className="glass-panel p-6 md:p-10 max-w-2xl border border-white/40 shadow-2xl"
-          >
-             <div className="flex items-center gap-4 mb-8 md:mb-10">
-              <div className="p-3 bg-rose-50 rounded-2xl text-rose-600">
-                <Flag className="w-6 h-6" />
+        {activeTab === 'file' && (
+          <motion.div key="file" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25, ease: EASE }}
+            className="card p-6 max-w-2xl">
+            
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                <Flag className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900 uppercase tracking-tight leading-none mb-1">New Grievance</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Submit your concern for internal review</p>
+                <h2 className="text-base font-semibold text-foreground">New Grievance</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Submit your concern for internal review</p>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {errorMsg && (
-                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700 text-xs font-bold">
-                  <AlertCircle className="w-4 h-4 shrink-0" /> {errorMsg}
-                </motion.div>
-              )}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <AnimatePresence>
+                {errorMsg && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                    className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+                  </motion.div>
+                )}
+              </AnimatePresence>
               
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 italic">Title / Subject</label>
-                <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-white/50 border border-slate-200 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all rounded-xl px-4 py-3.5 text-sm font-bold outline-none" placeholder="Brief summary of the issue" required />
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Title / Subject</label>
+                <input 
+                  type="text" 
+                  value={formData.title} 
+                  onChange={e => setFormData({...formData, title: e.target.value})} 
+                  className="input w-full" 
+                  placeholder="Brief summary of the issue" 
+                  required 
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 italic">Target Department</label>
-                  <div className="relative">
-                    <select 
-                      value={formData.department} 
-                      onChange={e => setFormData({...formData, department: e.target.value})} 
-                      className="custom-select w-full"
-                    >
-                      <option>HR</option>
-                      <option>Operations</option>
-                      <option>Technical</option>
-                    </select>
-                  </div>
+                <div className="space-y-1.5">
+                  <Select 
+                    label="Target Department"
+                    value={formData.department}
+                    onChange={(val) => setFormData({...formData, department: val})}
+                    options={[
+                      { value: 'HR', label: 'HR' },
+                      { value: 'Operations', label: 'Operations' },
+                      { value: 'Technical', label: 'Technical' },
+                    ]}
+                  />
                 </div>
 
-                <div className="flex items-end pb-1 px-1">
+                <div className="space-y-1.5">
+                  <Select 
+                    label="Priority Level"
+                    value={formData.priority}
+                    onChange={(val) => setFormData({...formData, priority: val})}
+                    options={[
+                      { value: 'low', label: 'Low Priority' },
+                      { value: 'medium', label: 'Medium Priority' },
+                      { value: 'high', label: 'High Priority' },
+                    ]}
+                  />
+                </div>
+
+                <div className="md:col-span-2 flex items-end pb-1 md:justify-end">
                   <label className="flex items-center gap-3 cursor-pointer group">
-                    <div className="relative">
+                    <div className="relative flex items-center">
                       <input 
                         type="checkbox" 
                         className="sr-only" 
                         checked={formData.is_anonymous}
                         onChange={e => setFormData({...formData, is_anonymous: e.target.checked})}
                       />
-                      <div className={cn(
-                        "w-10 h-6 rounded-full transition-colors duration-200",
-                        formData.is_anonymous ? "bg-rose-500" : "bg-slate-200"
-                      )} />
-                      <div className={cn(
-                        "absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200",
-                        formData.is_anonymous && "translate-x-4"
-                      )} />
+                      <div className={`w-10 h-6 rounded-full transition-colors duration-200 ${formData.is_anonymous ? 'bg-primary' : 'bg-secondary'}`} />
+                      <div className={`absolute left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${formData.is_anonymous ? 'translate-x-4' : 'translate-x-0'}`} />
                     </div>
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-700">
+                    <span className="text-sm font-semibold text-foreground group-hover:opacity-80 transition-opacity">
                       Submit Anonymously
                     </span>
                   </label>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 italic">Detailed Description</label>
-                <textarea rows={6} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-white/50 border border-slate-200 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all rounded-xl px-4 py-3.5 text-sm font-bold outline-none resize-none placeholder:text-slate-300 placeholder:italic" placeholder="Please describe the situation in detail..." required></textarea>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Detailed Description</label>
+                <textarea 
+                  rows={5} 
+                  value={formData.description} 
+                  onChange={e => setFormData({...formData, description: e.target.value})} 
+                  className="input w-full resize-none" 
+                  placeholder="Please describe the situation in detail..." 
+                  required 
+                />
               </div>
 
-              <button type="submit" disabled={fileMutation.isPending} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-2xl hover:bg-slate-800 transition-all active:scale-[0.98] mt-4 flex justify-center items-center gap-2 disabled:opacity-70">
-                {fileMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Flag className="w-5 h-5" />}
+              <button 
+                type="submit" 
+                disabled={fileMutation.isPending} 
+                className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {fileMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flag className="w-4 h-4" />}
                 {fileMutation.isPending ? 'Filing Case...' : 'Submit Grievance'}
               </button>
             </form>
           </motion.div>
-        ) : (
-          <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-panel overflow-hidden border border-white/40 shadow-2xl">
-            <div className="p-6 border-b border-white/20 bg-white/30 flex items-center justify-between">
+        )}
+
+        {activeTab === 'history' && (
+          <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25, ease: EASE }}
+            className="table-wrapper">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-900 uppercase tracking-tight leading-none mb-1">My Cases</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Track the progress of your submitted grievances</p>
+                <h2 className="text-sm font-semibold text-foreground leading-tight">My Cases</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Track the progress of your submitted grievances</p>
               </div>
             </div>
             
-            <div className="w-full overflow-x-auto custom-scrollbar">
-              <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-white/40 text-left border-b border-white/10">
-                    <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Subject</th>
-                    <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic hidden sm:table-cell">Dept</th>
-                    <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Description</th>
-                    <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic text-right">Status</th>
+                  <tr className="bg-secondary/50">
+                    <th className="table-header py-2.5 px-5 text-left">Subject</th>
+                    <th className="table-header py-2.5 px-5 text-left hidden sm:table-cell">Dept</th>
+                    <th className="table-header py-2.5 px-5 text-left">Description</th>
+                    <th className="table-header py-2.5 px-5 text-right">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/10">
+                <tbody>
                   {isLoading ? (
-                    <tr><td colSpan={4} className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary opacity-50" /></td></tr>
+                    <tr><td colSpan={4} className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-primary mx-auto" /></td></tr>
                   ) : !Array.isArray(myComplaints) || myComplaints.length === 0 ? (
-                    <tr><td colSpan={4} className="py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] italic">No cases found</td></tr>
+                    <tr><td colSpan={4} className="py-16 text-center">
+                      <MessageSquare className="w-8 h-8 mx-auto mb-3 text-muted-foreground opacity-30" />
+                      <p className="text-sm text-muted-foreground">No cases found.</p>
+                      <button onClick={() => setActiveTab('file')} className="mt-3 text-xs text-primary font-semibold hover:underline flex items-center gap-1 mx-auto">
+                        File a grievance <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </td></tr>
                   ) : (
                     myComplaints.map((comp: Complaint) => (
-                      <tr key={comp.id} className="transition-colors hover:bg-white/40 group align-top">
-                        <td className="py-4 px-4 md:px-6">
-                           <div className="flex items-start gap-3 mt-1">
-                              <Flag className="w-4 h-4 text-rose-500 shrink-0" />
-                              <span className="font-bold text-slate-800 text-xs uppercase leading-tight">{comp.title || 'No Title'}</span>
-                           </div>
+                      <tr key={comp.id} className="table-row align-top">
+                        <td className="py-4 px-5">
+                          <div className="flex items-start gap-2.5">
+                            <Flag className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <p className="font-semibold text-foreground text-sm truncate">{comp.title || 'No Title'}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">ID: {comp.id.substring(0, 8)}</p>
+                            </div>
+                          </div>
                         </td>
-                        <td className="py-4 px-4 md:px-6 hidden sm:table-cell">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic mt-1 block">{comp.department || 'General'}</span>
+                        <td className="py-4 px-5 hidden sm:table-cell">
+                          <span className="text-xs font-medium text-muted-foreground block">{comp.department || 'General'}</span>
+                          <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            comp.priority === 'high' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' :
+                            comp.priority === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                            'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                          }`}>
+                            {comp.priority || 'medium'}
+                          </span>
                         </td>
-                        <td className="py-4 px-4 md:px-6 w-full max-w-[200px] md:max-w-xs">
+                        <td className="py-4 px-5">
                            <div 
-                             className={cn(
-                               "text-xs text-slate-600 cursor-pointer transition-all",
-                               expandedId === comp.id ? "whitespace-pre-wrap" : "line-clamp-2"
-                             )}
+                             className={`text-sm text-foreground cursor-pointer transition-all ${expandedId === comp.id ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
                              onClick={() => setExpandedId(expandedId === comp.id ? null : comp.id)}
                            >
                              {comp.description}
                            </div>
                            {(comp.description?.length || 0) > 60 && (
-                             <span 
-                               className="inline-block cursor-pointer text-[9px] font-black text-primary mt-1 uppercase tracking-tighter"
+                             <button 
+                               className="text-xs text-primary font-medium mt-1 hover:underline focus:outline-none"
                                onClick={() => setExpandedId(expandedId === comp.id ? null : comp.id)}
                              >
-                               {expandedId === comp.id ? "Show Less" : "Read More"}
-                             </span>
+                               {expandedId === comp.id ? 'Show less' : 'Read more'}
+                             </button>
                            )}
                         </td>
-                        <td className="py-4 px-4 md:px-6 text-right">
-                           <StatusBadge status={comp.status} />
+                        <td className="py-4 px-5 text-right">
+                           <div className="flex flex-col items-end gap-1">
+                             <StatusBadge status={comp.status} />
+                             <p className="text-[10px] text-muted-foreground">{fmt(comp.created_at)}</p>
+                           </div>
                         </td>
                       </tr>
                     ))

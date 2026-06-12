@@ -80,3 +80,32 @@ export const useUIStore = create<UIState>((set) => ({
   isSidebarOpen: true,
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 }));
+
+// ─── Theme Store ──────────────────────────────────────────────────────────────
+interface ThemeState {
+  isDark: boolean;
+  toggleTheme: () => void;
+}
+
+export const useThemeStore = create<ThemeState>()(
+  persist(
+    (set, get) => ({
+      isDark: false,
+      toggleTheme: () => {
+        const next = !get().isDark;
+        set({ isDark: next });
+        document.documentElement.classList.toggle('dark', next);
+      },
+    }),
+    { name: 'theme-storage' }
+  )
+);
+
+// Apply persisted theme on first load
+const saved = localStorage.getItem('theme-storage');
+if (saved) {
+  try {
+    const { state } = JSON.parse(saved);
+    if (state?.isDark) document.documentElement.classList.add('dark');
+  } catch {}
+}

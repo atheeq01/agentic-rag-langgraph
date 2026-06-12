@@ -199,89 +199,71 @@ export default function AIChatPage() {
   // Shared Sidebar Content Render Function
   const renderSidebarContent = () => (
     <>
-      <div className="p-5 border-b border-white/20 flex items-center justify-between bg-white/30">
-        <span className="font-black uppercase tracking-[0.15em] text-[10px] text-slate-500 italic">Chat Archive</span>
+      <div className="p-4 border-b border-border flex items-center justify-between">
+        <span className="text-xs font-semibold text-muted-foreground">Chat History</span>
         {!isDesktop && (
-          <button onClick={() => setIsHistoryOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-            <X className="w-4 h-4 text-slate-400" />
+          <button onClick={() => setIsHistoryOpen(false)} className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground">
+            <X className="w-4 h-4" />
           </button>
         )}
       </div>
       <div className="p-2 overflow-y-auto flex-1 space-y-1 custom-scrollbar">
         {loadingSessions && (
-          <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary/60" /></div>
+          <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
         )}
         {sessions?.map((s: any, idx: number) => (
           <div
             key={s.id || idx}
-            onClick={() => {
-              handleSelectSession(s.id);
-              if (!isDesktop) setIsHistoryOpen(false);
-            }}
+            onClick={() => { handleSelectSession(s.id); if (!isDesktop) setIsHistoryOpen(false); }}
             className={cn(
-              "p-4 rounded-2xl cursor-pointer transition-all border group",
-              sessionId === s.id
-                ? 'bg-white shadow-md border-primary/20'
-                : 'hover:bg-white/60 border-transparent hover:border-white/40'
+              "p-3 rounded-xl cursor-pointer transition-all border",
+              sessionId === s.id ? 'bg-primary/10 border-primary/20' : 'border-transparent hover:bg-secondary'
             )}
           >
-            <h4 className={cn(
-              "text-xs font-bold truncate leading-tight mb-1 uppercase tracking-tight",
-              sessionId === s.id ? "text-primary" : "text-slate-700"
-            )}>
-              {s.title || `Untitled Session ${idx + 1}`}
+            <h4 className={cn("text-xs font-semibold truncate mb-0.5", sessionId === s.id ? 'text-primary' : 'text-foreground')}>
+              {s.title || `Session ${idx + 1}`}
             </h4>
-            <div className="flex items-center justify-between">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">
-                  {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Active Now'}
-                </p>
-            </div>
+            <p className="text-[10px] text-muted-foreground">
+              {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Active'}
+            </p>
           </div>
         ))}
         {!loadingSessions && (!sessions || sessions.length === 0) && (
           <div className="py-12 text-center">
-            <Bot className="w-8 h-8 text-slate-200 mx-auto mb-2 opacity-50" />
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic px-4">No conversations found.</p>
+            <Bot className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-xs text-muted-foreground">No conversations yet.</p>
           </div>
         )}
       </div>
-      <div className="p-4 border-t border-white/20 bg-white/20">
+      <div className="p-3 border-t border-border">
         <button
           onClick={() => newChatMutation.mutate()}
           disabled={newChatMutation.isPending}
-          className="w-full py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:bg-slate-800 shadow-xl shadow-slate-900/10 flex items-center justify-center gap-2 disabled:opacity-60"
+          className="btn-primary w-full py-2.5 text-sm disabled:opacity-60"
         >
           {newChatMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          New Conversation
+          New conversation
         </button>
       </div>
     </>
   );
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 md:gap-6 h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] relative">
+    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-7rem)] relative">
       {/* Mobile History Toggle */}
-      <div className="lg:hidden flex items-center justify-between px-2 mb-2">
-         <button 
-           onClick={() => setIsHistoryOpen(true)}
-           className="flex items-center gap-2 px-4 py-2 bg-white/60 border border-white/40 rounded-xl text-xs font-bold uppercase tracking-widest text-primary shadow-sm"
-         >
-           <MessageSquare className="w-4 h-4" /> 
-           Show History
+      <div className="lg:hidden flex items-center justify-between mb-2">
+         <button onClick={() => setIsHistoryOpen(true)}
+           className="flex items-center gap-2 px-3 py-2 card text-xs font-medium text-primary">
+           <MessageSquare className="w-4 h-4" /> History
          </button>
-         
-         <button
-            onClick={() => newChatMutation.mutate()}
-            className="p-2 bg-primary text-white rounded-xl shadow-lg"
-            title="New Chat"
-         >
-            <Plus className="w-5 h-5" />
+         <button onClick={() => newChatMutation.mutate()} className="btn-primary py-2" title="New Chat">
+            <Plus className="w-4 h-4" /> New
          </button>
       </div>
 
-      {/* Desktop Sidebar (Rendered inline) */}
+      {/* Desktop Sidebar */}
       {isDesktop && (
-        <div className="glass-panel hidden lg:flex flex-col overflow-hidden relative w-64 shadow-xl z-10 border border-white/40">
+        <div className="card hidden lg:flex flex-col overflow-hidden w-60 flex-shrink-0">
           {renderSidebarContent()}
         </div>
       )}
@@ -305,7 +287,7 @@ export default function AIChatPage() {
                 initial={{ x: -300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -300, opacity: 0 }}
-                className="fixed inset-y-0 left-0 w-72 m-4 glass-panel flex flex-col overflow-hidden shadow-2xl z-[101] border border-white/40"
+                className="fixed inset-y-0 left-0 w-72 m-4 card flex flex-col overflow-hidden shadow-2xl z-[101]"
               >
                 {renderSidebarContent()}
               </motion.div>
@@ -316,35 +298,28 @@ export default function AIChatPage() {
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 glass-panel flex flex-col overflow-hidden relative border border-white/40 shadow-2xl">
-        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-          <Bot className="w-96 h-96" />
-        </div>
-
-        <div className="h-16 border-b border-white/20 flex items-center px-4 md:px-6 bg-white/40 backdrop-blur z-10 justify-between">
+      <div className="flex-1 card flex flex-col overflow-hidden">
+        <div className="h-14 border-b border-border flex items-center px-4 justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary to-[#7b42f6] flex items-center justify-center text-white shadow-lg">
-              <Bot className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white">
+              <Bot className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-black text-sm uppercase tracking-widest text-slate-800 leading-none mb-1">Apex AI Assistant</h3>
-              <p className="text-[10px] text-emerald-600 font-black flex items-center gap-1 uppercase tracking-widest italic">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Network Active
+              <p className="text-sm font-semibold text-foreground leading-none">Apex AI Assistant</p>
+              <p className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Online
               </p>
             </div>
           </div>
-
           <button
-            onClick={() => {
-              setMessages([{ ...WELCOME_MSG, content: 'Neural context reset. Awaiting new instructions.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
-            }}
-            className="px-4 py-2 bg-white/60 border border-white rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-primary transition-all shadow-sm"
+            onClick={() => setMessages([{ ...WELCOME_MSG, content: 'Session reset. How can I help you?', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])}
+            className="btn-ghost text-xs py-1.5"
           >
             Reset
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 z-10 scroll-smooth custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 custom-scrollbar">
           {loadingHistory ? (
             <div className="flex-1 flex items-center justify-center py-24">
               <div className="flex flex-col items-center gap-4">
@@ -365,34 +340,29 @@ export default function AIChatPage() {
                   msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''
                 )}
               >
-                <div className="shrink-0 mt-1">
+                <div className="flex-shrink-0 mt-0.5">
                   {msg.role === 'agent' ? (
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-2xl bg-gradient-to-tr from-primary to-[#7b42f6] flex items-center justify-center text-white shadow-xl">
-                      <Bot className="w-4 h-4 md:w-5 md:h-5" />
+                    <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white">
+                      <Bot className="w-4 h-4" />
                     </div>
                   ) : (
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 font-bold shadow-md border border-white">
-                      <User className="w-4 h-4 md:w-5 md:h-5" />
+                    <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground">
+                      <User className="w-4 h-4" />
                     </div>
                   )}
                 </div>
 
-                <div className={cn(
-                  "flex flex-col gap-1.5",
-                  msg.role === 'user' ? 'items-end' : ''
-                )}>
-                  <div
-                    className={cn(
-                      "px-5 py-3.5 md:px-6 md:py-4 shadow-xl",
-                      msg.role === 'user'
-                        ? 'bg-primary text-white rounded-[2rem] rounded-tr-sm'
-                        : 'bg-white border border-white/60 rounded-[2rem] rounded-tl-sm text-slate-800'
-                    )}
-                  >
+                <div className={cn("flex flex-col gap-1", msg.role === 'user' ? 'items-end' : '')}>
+                  <div className={cn(
+                    "px-4 py-3 max-w-[680px]",
+                    msg.role === 'user'
+                      ? 'bg-primary text-white rounded-2xl rounded-tr-sm shadow-sm'
+                      : 'bg-secondary border border-border rounded-2xl rounded-tl-sm'
+                  )}>
                     <div className={cn(
-                      "text-sm md:text-base leading-relaxed font-medium prose prose-sm max-w-none break-words",
-                      msg.role === 'user' ? 'prose-invert text-white' : 'prose-slate text-slate-800',
-                      "prose-p:leading-relaxed prose-pre:bg-slate-800 prose-pre:text-slate-50"
+                      "text-sm leading-relaxed prose prose-sm max-w-none break-words",
+                      msg.role === 'user' ? 'prose-invert text-white' : 'text-foreground prose-slate',
+                      "prose-p:leading-relaxed prose-pre:bg-secondary prose-pre:text-foreground"
                     )}>
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
@@ -439,14 +409,14 @@ export default function AIChatPage() {
           )}
 
           {chatMutation.isPending && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4 max-w-[85%]">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary to-[#7b42f6] flex items-center justify-center text-white shadow-xl">
-                <Bot className="w-5 h-5" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+              <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white flex-shrink-0 mt-1">
+                <Bot className="w-4 h-4" />
               </div>
-              <div className="bg-white border border-white/60 px-6 py-4 rounded-[2rem] rounded-tl-sm shadow-xl flex items-center gap-1.5">
+              <div className="bg-secondary border border-border px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce delay-100"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce delay-200"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{animationDelay:'150ms'}}></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{animationDelay:'300ms'}}></span>
               </div>
             </motion.div>
           )}
@@ -454,8 +424,8 @@ export default function AIChatPage() {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 md:p-6 bg-white/40 border-t border-white/20 backdrop-blur-xl z-20">
-          <div className="relative flex items-end max-w-4xl mx-auto w-full group">
+        <div className="p-3 md:p-4 border-t border-border flex-shrink-0">
+          <div className="relative flex items-end gap-2">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -463,27 +433,25 @@ export default function AIChatPage() {
               onChange={(e) => {
                 setInput(e.target.value);
                 e.target.style.height = 'auto';
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
               }}
               disabled={chatMutation.isPending}
-              placeholder="Query HR knowledge base..."
-              className="w-full bg-white/80 border border-white shadow-2xl focus:border-primary/40 focus:ring-4 focus:ring-primary/5 transition-all rounded-[1.5rem] pl-6 pr-16 py-4 md:py-5 text-sm md:text-base font-bold outline-none disabled:opacity-50 placeholder:text-slate-300 resize-none custom-scrollbar"
-              style={{ minHeight: '56px', maxHeight: '200px' }}
+              placeholder="Ask anything about HR policies, leaves, complaints…"
+              className="flex-1 input resize-none custom-scrollbar pr-4"
+              style={{ minHeight: '48px', maxHeight: '160px' }}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || chatMutation.isPending}
-              className="absolute right-3 bottom-2 md:bottom-2.5 p-3.5 bg-primary text-white rounded-2xl hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-50 transition-all shadow-xl shadow-primary/20"
+              className="btn-primary p-3 flex-shrink-0 disabled:opacity-50"
             >
-              <Send className="w-4 h-4 md:w-5 md:h-5 ml-0.5" />
+              <Send className="w-4 h-4" />
             </button>
           </div>
+          <p className="text-[10px] text-muted-foreground mt-2 text-center">Press Enter to send · Shift+Enter for new line</p>
         </div>
       </div>
     </div>

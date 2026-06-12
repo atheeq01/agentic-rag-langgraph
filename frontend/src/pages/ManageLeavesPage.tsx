@@ -1,26 +1,53 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { Easing } from 'framer-motion';
 import { 
-  Loader2, 
-  Users, 
-  Check, 
-  X,
-  History
+  Loader2, Users, Check, X, History,
+  CheckCircle2, Clock as ClockIcon, Calendar, ArrowRight
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
+const EASE: Easing = 'easeOut';
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.4, delay, ease: EASE },
+});
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    pending:  'badge-pending',
+    approved: 'badge-approved',
+    rejected: 'badge-rejected',
+    resolved: 'badge-resolved',
+    open:     'badge-open',
+  };
+  const dot: Record<string, string> = {
+    pending:  'bg-amber-500',
+    approved: 'bg-emerald-500',
+    rejected: 'bg-rose-500',
+    resolved: 'bg-blue-500',
+    open:     'bg-orange-500',
+  };
+  return (
+    <span className={`badge ${map[status.toLowerCase()] ?? 'badge-open'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot[status.toLowerCase()] ?? 'bg-slate-400'}`} />
+      <span className="capitalize">{status}</span>
+    </span>
+  );
+}
+
 export default function ManageLeavesPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Fetch ALL team leaves (removed ?status=pending so we get history too)
   const { data: allTeamLeaves, isLoading: loadingTeam } = useQuery({
     queryKey: ['leaves', 'team'],
     queryFn: () => api.get('/leaves/team').then(res => res.data),
   });
 
-  // Filter the leaves into two categories
   const pendingLeaves = allTeamLeaves?.filter((leave: any) => leave.status === 'pending') || [];
   const respondedLeaves = allTeamLeaves?.filter((leave: any) => leave.status !== 'pending') || [];
 
@@ -32,129 +59,112 @@ export default function ManageLeavesPage() {
     }
   });
 
-  // Helper component for the history status badge
-  const StatusBadge = ({ status }: { status: string }) => {
-    const isApproved = status.toLowerCase() === 'approved';
-    return (
-      <span className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border",
-        isApproved 
-          ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
-          : "bg-rose-50 text-rose-700 border-rose-100"
-      )}>
-        {status}
-      </span>
-    );
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
+  const fmt = (dateString?: string) => {
+    if (!dateString) return '—';
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const calculateTotalDays = (start: string, end: string) => {
+  const calcDays = (start: string, end: string) => {
     if (!start || !end) return 0;
-    const diffTime = Math.abs(new Date(end).getTime() - new Date(start).getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return Math.ceil(Math.abs(new Date(end).getTime() - new Date(start).getTime()) / 86_400_000) + 1;
   };
 
   return (
-    <div className="space-y-6 md:space-y-8 max-w-6xl mx-auto pb-10">
-      <div className="flex flex-col gap-1 px-1">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 leading-tight">Manage Team Leaves</h1>
-        <p className="text-sm md:text-base text-slate-500">Review and coordinate employee time-off requests.</p>
-      </div>
+    <div className="space-y-6 max-w-6xl mx-auto pb-10">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
+        <h1 className="text-xl font-bold text-foreground">Manage Team Leaves</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Review and coordinate employee time-off requests.</p>
+      </motion.div>
 
-      {/* --- PENDING QUEUE BLOCK --- */}
-      <div className="glass-panel overflow-hidden border border-white/40 shadow-2xl">
-        <div className="p-5 md:p-6 border-b border-white/20 bg-white/30 flex items-center justify-between">
+      {/* Pending Queue */}
+      <motion.div {...fadeUp(0.05)} className="table-wrapper">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-             <div className="p-3 bg-amber-50 rounded-2xl text-amber-600">
-                <Users className="w-6 h-6" />
-             </div>
-             <div>
-                <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight leading-none mb-1">Pending Queue</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Action required applications</p>
-             </div>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground leading-tight">Pending Queue</h2>
+              <p className="text-xs text-muted-foreground">Action required applications</p>
+            </div>
           </div>
+          <span className="text-xs font-semibold text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
+            {pendingLeaves.length} pending
+          </span>
         </div>
 
-        <div className="w-full overflow-x-auto custom-scrollbar">
-          <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-white/40 text-left border-b border-white/10">
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Employee</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic hidden sm:table-cell min-w-[180px]">Duration</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Explanation</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic text-right">Decision</th>
+              <tr className="bg-secondary/50">
+                <th className="table-header py-2.5 px-5 text-left">Employee</th>
+                <th className="table-header py-2.5 px-5 text-left hidden sm:table-cell">Duration</th>
+                <th className="table-header py-2.5 px-5 text-left">Explanation</th>
+                <th className="table-header py-2.5 px-5 text-right">Decision</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody>
               {loadingTeam ? (
-                 <tr><td colSpan={4} className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary opacity-50" /></td></tr>
+                <tr><td colSpan={4} className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-primary mx-auto" /></td></tr>
               ) : pendingLeaves.length === 0 ? (
-                 <tr><td colSpan={4} className="py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] italic">No pending leave requests found</td></tr>
+                <tr><td colSpan={4} className="py-16 text-center">
+                  <CheckCircle2 className="w-8 h-8 mx-auto mb-3 text-muted-foreground opacity-30" />
+                  <p className="text-sm text-muted-foreground">No pending requests.</p>
+                  <p className="text-xs text-muted-foreground mt-1">You're all caught up!</p>
+                </td></tr>
               ) : (
                 pendingLeaves.map((leave: any) => (
-                  <tr key={leave.id} className="transition-colors hover:bg-white/40 group align-top">
-                    <td className="py-4 px-4 md:px-6">
-                       <div className="flex items-start gap-3 mt-1">
-                          <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-white flex items-center justify-center text-slate-600 font-black text-xs shadow-sm">
-                             {(leave.applicant_name || 'U').substring(0, 2).toUpperCase()}
+                  <tr key={leave.id} className="table-row align-top">
+                    <td className="py-4 px-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
+                          {(leave.applicant_name || 'U').substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground text-sm truncate">{leave.applicant_name || 'Unknown'}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{leave.department || 'General'}</p>
+                          {/* Mobile only duration */}
+                          <div className="sm:hidden mt-2">
+                            <p className="text-xs font-semibold text-foreground">{leave.leave_type}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{leave.start_date} → {leave.end_date}</p>
                           </div>
-                          <div className="flex flex-col min-w-0">
-                             <span className="font-bold text-slate-900 text-sm truncate">{leave.applicant_name || 'Unknown'}</span>
-                             <span className="text-[10px] font-black uppercase text-indigo-600 mt-0.5">
-                               {leave.department || 'General'}
-                             </span>
-                             {/* Mobile Duration Info */}
-                             <div className="sm:hidden flex flex-col mt-2">
-                                <span className="text-[9px] font-black text-slate-900">{leave.start_date}</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">to {leave.end_date}</span>
-                                <span className="text-[9px] font-black text-primary mt-0.5">{leave.leave_type}</span>
-                             </div>
-                          </div>
-                       </div>
+                        </div>
+                      </div>
                     </td>
-                    <td className="py-4 px-4 md:px-6 hidden sm:table-cell min-w-[180px]">
-                       <div className="flex flex-col mt-1">
-                          <span className="text-[10px] font-black text-slate-900">{leave.start_date}</span>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">to {leave.end_date}</span>
-                          <span className="text-[8px] font-black text-primary mt-1">{leave.leave_type}</span>
-                       </div>
+                    <td className="py-4 px-5 hidden sm:table-cell">
+                      <p className="font-semibold text-foreground">{calcDays(leave.start_date, leave.end_date)} days</p>
+                      <p className="text-xs text-muted-foreground mt-1 capitalize">{leave.leave_type}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{leave.start_date} → {leave.end_date}</p>
                     </td>
-                    <td className="py-4 px-4 md:px-6 w-full max-w-[150px] md:max-w-xs">
+                    <td className="py-4 px-5">
                       <div 
-                        className={cn(
-                          "text-xs text-slate-600 cursor-pointer hover:text-primary transition-all mt-1",
-                          expandedId === leave.id ? "whitespace-pre-wrap" : "line-clamp-2"
-                        )}
+                        className={`text-sm text-foreground cursor-pointer transition-all ${expandedId === leave.id ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
                         onClick={() => setExpandedId(expandedId === leave.id ? null : leave.id)}
                       >
-                        {leave.reason}
+                        {leave.reason || <span className="italic text-muted-foreground">No reason provided.</span>}
                       </div>
-                      {(leave.reason?.length || 0) > 40 && (
-                        <span 
-                          className="inline-block cursor-pointer text-[9px] font-black text-primary mt-1 uppercase tracking-tighter"
+                      {(leave.reason?.length || 0) > 60 && (
+                        <button 
+                          className="text-xs text-primary font-medium mt-1 hover:underline focus:outline-none"
                           onClick={() => setExpandedId(expandedId === leave.id ? null : leave.id)}
                         >
-                          {expandedId === leave.id ? "Show Less" : "Click to Expand"}
-                        </span>
+                          {expandedId === leave.id ? 'Show less' : 'Read more'}
+                        </button>
                       )}
                     </td>
-                    <td className="py-4 px-4 md:px-6 text-right">
-                      <div className="flex flex-col gap-2 items-end mt-1">
+                    <td className="py-4 px-5 text-right">
+                      <div className="flex flex-col gap-2 items-end">
                         <button
                           onClick={() => actionMutation.mutate({ id: leave.id, approve: true })}
                           disabled={actionMutation.isPending}
-                          className="w-[100px] flex items-center justify-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100/50 text-[10px] font-black uppercase tracking-widest"
+                          className="w-[100px] flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-600 rounded-lg transition-colors text-xs font-semibold"
                         >
                           <Check className="w-3.5 h-3.5" /> Approve
                         </button>
                         <button
                           onClick={() => actionMutation.mutate({ id: leave.id, approve: false })}
                           disabled={actionMutation.isPending}
-                          className="w-[100px] flex items-center justify-center gap-2 px-3 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-all border border-rose-100/50 text-[10px] font-black uppercase tracking-widest"
+                          className="w-[100px] flex items-center justify-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 rounded-lg transition-colors text-xs font-semibold"
                         >
                           <X className="w-3.5 h-3.5" /> Reject
                         </button>
@@ -166,83 +176,78 @@ export default function ManageLeavesPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </motion.div>
 
-      {/* --- RESPONDED LEAVES HISTORY BLOCK --- */}
-      <div className="glass-panel overflow-hidden border border-white/40 shadow-2xl mt-8 opacity-80 hover:opacity-100 transition-opacity">
-        <div className="p-5 md:p-6 border-b border-white/20 bg-white/30 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-             <div className="p-3 bg-slate-100 rounded-2xl text-slate-500">
-                <History className="w-6 h-6" />
-             </div>
-             <div>
-                <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight leading-none mb-1">Leave History</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Previously actioned requests</p>
-             </div>
+      {/* History */}
+      <motion.div {...fadeUp(0.1)} className="table-wrapper">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-secondary text-muted-foreground flex items-center justify-center">
+            <History className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground leading-tight">Leave History</h2>
+            <p className="text-xs text-muted-foreground">Previously actioned requests</p>
           </div>
         </div>
 
-        <div className="w-full overflow-x-auto custom-scrollbar">
-          <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-white/40 text-left border-b border-white/10">
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Employee</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic hidden sm:table-cell min-w-[180px]">Duration</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Explanation</th>
-                <th className="px-4 md:px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest italic text-right">Status</th>
+              <tr className="bg-secondary/50">
+                <th className="table-header py-2.5 px-5 text-left">Employee</th>
+                <th className="table-header py-2.5 px-5 text-left hidden sm:table-cell">Duration</th>
+                <th className="table-header py-2.5 px-5 text-left">Explanation</th>
+                <th className="table-header py-2.5 px-5 text-right">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody>
               {loadingTeam ? (
-                 <tr><td colSpan={4} className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary opacity-50" /></td></tr>
+                <tr><td colSpan={4} className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-primary mx-auto" /></td></tr>
               ) : respondedLeaves.length === 0 ? (
-                 <tr><td colSpan={4} className="py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] italic">No leave history found</td></tr>
+                <tr><td colSpan={4} className="py-16 text-center">
+                  <History className="w-8 h-8 mx-auto mb-3 text-muted-foreground opacity-30" />
+                  <p className="text-sm text-muted-foreground">No leave history found.</p>
+                </td></tr>
               ) : (
                 respondedLeaves.map((leave: any) => (
-                  <tr key={leave.id} className="transition-colors hover:bg-white/40 group align-top">
-                    <td className="py-4 px-4 md:px-6">
-                       <div className="flex items-start gap-3 mt-1">
-                          <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-white flex items-center justify-center text-slate-400 font-black text-xs shadow-sm">
-                             {(leave.applicant_name || 'U').substring(0, 2).toUpperCase()}
+                  <tr key={leave.id} className="table-row align-top">
+                    <td className="py-4 px-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-secondary text-muted-foreground text-xs font-bold flex items-center justify-center flex-shrink-0">
+                          {(leave.applicant_name || 'U').substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground text-sm truncate">{leave.applicant_name || 'Unknown'}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{leave.department || 'General'}</p>
+                          {/* Mobile only duration */}
+                          <div className="sm:hidden mt-2">
+                            <p className="text-xs font-semibold text-foreground capitalize">{leave.leave_type} ({calcDays(leave.start_date, leave.end_date)}d)</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{leave.start_date} → {leave.end_date}</p>
                           </div>
-                          <div className="flex flex-col min-w-0">
-                             <span className="font-bold text-slate-700 text-sm truncate">{leave.applicant_name || 'Unknown'}</span>
-                             <span className="text-[10px] font-black uppercase text-slate-400 mt-0.5">
-                               {leave.department || 'General'}
-                             </span>
-                             {/* Mobile Duration Info */}
-                             <div className="sm:hidden flex flex-col mt-2">
-                                <span className="text-[9px] font-bold text-slate-800">{calculateTotalDays(leave.start_date, leave.end_date)} Days</span>
-                                <span className="text-[9px] font-black text-slate-500 mt-0.5">{leave.start_date} to {leave.end_date}</span>
-                             </div>
-                          </div>
-                       </div>
-                    </td>
-                    <td className="py-4 px-4 md:px-6 hidden sm:table-cell min-w-[180px]">
-                       <div className="flex flex-col mt-1">
-                          <span className="text-[10px] font-bold text-slate-800">{calculateTotalDays(leave.start_date, leave.end_date)} Days</span>
-                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic mt-0.5">{leave.start_date} to {leave.end_date}</span>
-                          <span className="text-[8px] font-black text-slate-400 mt-1.5 uppercase tracking-widest">Applied: {formatDate(leave.created_at)}</span>
-                       </div>
-                    </td>
-                    <td className="py-4 px-4 md:px-6 w-full max-w-[150px] md:max-w-xs">
-                      <div 
-                        className={cn(
-                          "text-xs text-slate-500 cursor-pointer hover:text-slate-800 transition-all mt-1",
-                          expandedId === leave.id ? "whitespace-pre-wrap" : "line-clamp-2"
-                        )}
-                        onClick={() => setExpandedId(expandedId === leave.id ? null : leave.id)}
-                      >
-                        {leave.reason}
+                        </div>
                       </div>
                     </td>
-                    <td className="py-4 px-4 md:px-6 text-right align-middle">
-                      <div className="flex flex-col items-end mt-1 gap-1">
+                    <td className="py-4 px-5 hidden sm:table-cell">
+                      <p className="font-semibold text-foreground">{calcDays(leave.start_date, leave.end_date)} days</p>
+                      <p className="text-xs text-muted-foreground mt-1 capitalize">{leave.leave_type}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{leave.start_date} → {leave.end_date}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1.5">Applied: {fmt(leave.created_at)}</p>
+                    </td>
+                    <td className="py-4 px-5">
+                      <div 
+                        className={`text-sm text-foreground cursor-pointer transition-all ${expandedId === leave.id ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
+                        onClick={() => setExpandedId(expandedId === leave.id ? null : leave.id)}
+                      >
+                        {leave.reason || <span className="italic text-muted-foreground">No reason provided.</span>}
+                      </div>
+                    </td>
+                    <td className="py-4 px-5 text-right">
+                      <div className="flex flex-col gap-1 items-end">
                         <StatusBadge status={leave.status} />
                         {leave.approved_at && (
-                          <div className="flex flex-col items-end mt-1">
-                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Actioned By: {leave.approver_name || 'Manager'}</span>
-                            <span className="text-[8px] font-bold text-slate-400">{formatDate(leave.approved_at)}</span>
+                          <div className="mt-1 flex flex-col items-end">
+                            <p className="text-[10px] text-muted-foreground">Actioned by {leave.approver_name || 'Manager'}</p>
+                            <p className="text-[10px] text-muted-foreground">{fmt(leave.approved_at)}</p>
                           </div>
                         )}
                       </div>
@@ -253,7 +258,7 @@ export default function ManageLeavesPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

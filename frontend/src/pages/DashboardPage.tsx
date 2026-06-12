@@ -1,282 +1,489 @@
 import { motion } from 'framer-motion';
-import { Calendar, Flag, Users, MessageSquarePlus, FileText, Clock, Loader2 } from 'lucide-react';
+import type { Easing } from 'framer-motion';
+import {
+  Calendar, Flag, Users, MessageSquarePlus, FileText,
+  Clock, Loader2, TrendingUp, ArrowRight, type LucideProps, CheckCircle2
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore, isManagerOrAbove, isHROrAdmin } from '@/store/useStore';
+
+const EASE: Easing = 'easeOut';
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.4, delay, ease: EASE },
+});
+
+// ── Skeleton loader ────────────────────────────────────────────
+function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-lg bg-secondary ${className}`} />;
+}
+
+// ── Stat card ──────────────────────────────────────────────────
+function StatCard({
+  label, value, sub, icon: Icon, color, bg, loading, href, actionLabel,
+}: {
+  label: string; value: string | number; sub?: string;
+  icon: React.FC<LucideProps>; color: string; bg: string;
+  loading?: boolean; href?: string; actionLabel?: string;
+}) {
+  return (
+    <div className="card p-5 flex flex-col gap-3 h-full hover:shadow-card-md transition-shadow">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-muted-foreground truncate">{label}</p>
+          {loading ? (
+            <Skeleton className="h-8 w-20 mt-1" />
+          ) : (
+            <p className="text-3xl font-bold text-foreground tracking-tight mt-0.5">{value}</p>
+          )}
+          {sub && !loading && (
+            <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+          )}
+        </div>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${bg}`}>
+          <Icon className={`w-5 h-5 ${color}`} />
+        </div>
+      </div>
+      {href && (
+        <Link
+          to={href}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:opacity-80 transition-opacity mt-auto"
+        >
+          {actionLabel ?? 'View all'} <ArrowRight className="w-3 h-3" />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+// ── Leave balance row ──────────────────────────────────────────
+function LeaveBar({ label, remaining, total, color }: {
+  label: string; remaining: number; total: number; color: string;
+}) {
+  const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
+  const isLow = pct < 25;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className={`text-xs font-semibold ${isLow ? 'text-rose-500' : 'text-foreground'}`}>
+          {remaining} / {total} days
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+        <motion.div
+          className={`h-full rounded-full ${isLow ? 'bg-rose-400' : color}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.8, ease: EASE, delay: 0.2 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Status badge ───────────────────────────────────────────────
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    pending:  'badge-pending',
+    approved: 'badge-approved',
+    rejected: 'badge-rejected',
+    resolved: 'badge-resolved',
+    open:     'badge-open',
+  };
+  const dot: Record<string, string> = {
+    pending:  'bg-amber-500',
+    approved: 'bg-emerald-500',
+    rejected: 'bg-rose-500',
+    resolved: 'bg-blue-500',
+    open:     'bg-orange-500',
+  };
+  return (
+    <span className={`badge ${map[status] ?? 'badge-open'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot[status] ?? 'bg-slate-400'}`} />
+      <span className="capitalize">{status}</span>
+    </span>
+  );
+}
 
 export default function DashboardPage() {
   const user = useAuthStore(state => state.user);
 
   const { data: myLeaves, isLoading: loadingLeaves } = useQuery({
     queryKey: ['leaves', 'me'],
-    queryFn: () => api.get('/leaves/me').then(res => res.data)
+    queryFn: () => api.get('/leaves/me').then(res => res.data),
   });
 
   const { data: teamLeaves, isLoading: loadingTeamLeaves } = useQuery({
     queryKey: ['leaves', 'team'],
     queryFn: () => api.get('/leaves/team?status=pending').then(res => res.data),
-    enabled: isManagerOrAbove(user)
+    enabled: isManagerOrAbove(user),
   });
 
   const { data: teamMembers, isLoading: loadingTeamMembers } = useQuery({
     queryKey: ['users', 'team'],
     queryFn: () => api.get('/users/').then(res => res.data),
-    enabled: isManagerOrAbove(user)
+    enabled: isManagerOrAbove(user),
   });
 
   const { data: myComplaints, isLoading: loadingComplaints } = useQuery({
     queryKey: ['complaints', 'me'],
-    queryFn: () => api.get('/complaints/me').then(res => res.data)
+    queryFn: () => api.get('/complaints/me').then(res => res.data),
   });
 
-  // Helper to calculate days between two dates
-  const calculateDays = (start: string, end: string) => {
-    const s = new Date(start);
-    const e = new Date(end);
-    return Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  };
+  const calcDays = (s: string, e: string) =>
+    Math.ceil((new Date(e).getTime() - new Date(s).getTime()) / 86_400_000) + 1;
 
-  // Logic to calculate remaining balances dynamically
-  const calculateRemaining = (type: string, baseBalance: number) => {
-    const used = myLeaves
+  const calcUsed = (type: string) =>
+    myLeaves
       ?.filter((l: any) => l.status === 'approved' && l.leave_type.toLowerCase().includes(type))
-      .reduce((acc: number, l: any) => acc + calculateDays(l.start_date, l.end_date), 0) || 0;
-    return baseBalance - used;
+      .reduce((acc: number, l: any) => acc + calcDays(l.start_date, l.end_date), 0) ?? 0;
+
+  const annualBase  = user?.annual_leave_balance    ?? 20;
+  const sickBase    = user?.sick_leave_balance      ?? 10;
+  const matBase     = user?.maternity_leave_balance ?? 0;
+  const patBase     = user?.paternity_leave_balance ?? 0;
+
+  const annualRem = annualBase  - calcUsed('annual');
+  const sickRem   = sickBase    - calcUsed('sick');
+
+  const activeComplaints = myComplaints?.filter((c: any) => c.status !== 'resolved').length ?? 0;
+  const teamPending      = teamLeaves?.length ?? 0;
+
+  const greeting = () => {
+    const h = new Date().getHours();
+    return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   };
 
-  // Get base balances from the updated /auth/me profile
-  const annualRemaining = calculateRemaining('annual', user?.annual_leave_balance || 20);
-  const sickRemaining = calculateRemaining('sick', user?.sick_leave_balance || 10);
-  const activeComplaintsCount = myComplaints?.filter((c: any) => c.status !== 'resolved').length || 0;
-  const teamLeavesCount = teamLeaves?.length || 0;
+  const firstName = user?.name?.split(' ')[0] ?? '';
 
-  // Build quick actions based on role
   const quickActions = [
-    { title: "APPLY LEAVE", icon: Calendar, color: "text-blue-500", path: "/leaves" },
-    { title: "FILE COMPLAINT", icon: Flag, color: "text-rose-500", path: "/complaints" },
-    { title: "CHAT WITH AI", icon: MessageSquarePlus, color: "text-purple-500", path: "/ai-chat" },
-    ...(isHROrAdmin(user) ? [{ title: "MANAGE DOCUMENTS", icon: FileText, color: "text-teal-500", path: "/documents" }] : []),
+    { title: 'Apply Leave',    icon: Calendar,          path: '/leaves',             color: 'text-blue-500',  bg: 'bg-blue-50 dark:bg-blue-500/10' },
+    { title: 'File Complaint', icon: Flag,              path: '/complaints',         color: 'text-rose-500',  bg: 'bg-rose-50 dark:bg-rose-500/10' },
+    { title: 'AI Assistant',   icon: MessageSquarePlus, path: '/ai-chat',            color: 'text-primary',   bg: 'bg-primary/10' },
+    ...(isHROrAdmin(user) ? [{ title: 'Documents', icon: FileText, path: '/documents', color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-500/10' }] : []),
+  ];
+
+  const leaveBars = [
+    { label: 'Annual Leave',    remaining: annualRem, total: annualBase, color: 'bg-primary' },
+    { label: 'Sick Leave',      remaining: sickRem,   total: sickBase,   color: 'bg-blue-500' },
+    ...(matBase > 0 ? [{ label: 'Maternity Leave', remaining: matBase, total: matBase, color: 'bg-pink-500' }] : []),
+    ...(patBase > 0 ? [{ label: 'Paternity Leave', remaining: patBase, total: patBase, color: 'bg-purple-500' }] : []),
   ];
 
   return (
-    <div className="space-y-6 md:space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold uppercase tracking-tight text-slate-900 leading-none mb-1">MAIN DASHBOARD</h1>
-          {user && (
-            <p className="text-sm text-muted-foreground font-medium">
-              Welcome back, <span className="text-slate-900 font-bold">{user.name}</span>
+    <div className="space-y-6">
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <motion.div {...fadeUp()}>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">
+              {greeting()}{firstName ? `, ${firstName}` : ''} 👋
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Here's what's happening with your HR workspace today.
             </p>
+          </div>
+          {user && (
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold capitalize flex-shrink-0">
+              <TrendingUp className="w-3.5 h-3.5" />
+              {user.role}
+            </span>
           )}
         </div>
-        {user && (
-           <span className="w-fit text-[10px] bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full font-bold uppercase tracking-wider tabular-nums">
-             {user.role} Account
-           </span>
+      </motion.div>
+
+      {/* ── Top stat cards ─────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div {...fadeUp(0.05)} className="col-span-1">
+          <StatCard
+            label="Annual Leave"
+            value={loadingLeaves ? '—' : `${annualRem} days`}
+            sub={`of ${annualBase} total`}
+            icon={Calendar}
+            color="text-blue-500"
+            bg="bg-blue-50 dark:bg-blue-500/10"
+            loading={loadingLeaves}
+            href="/leaves"
+            actionLabel="Book leave"
+          />
+        </motion.div>
+        <motion.div {...fadeUp(0.08)} className="col-span-1">
+          <StatCard
+            label="Sick Leave"
+            value={loadingLeaves ? '—' : `${sickRem} days`}
+            sub={`of ${sickBase} total`}
+            icon={Clock}
+            color="text-emerald-500"
+            bg="bg-emerald-50 dark:bg-emerald-500/10"
+            loading={loadingLeaves}
+            href="/leaves"
+            actionLabel="Book sick leave"
+          />
+        </motion.div>
+        <motion.div {...fadeUp(0.11)} className="col-span-1">
+          <StatCard
+            label="Active Complaints"
+            value={loadingComplaints ? '—' : activeComplaints}
+            sub="open / under review"
+            icon={Flag}
+            color="text-rose-500"
+            bg="bg-rose-50 dark:bg-rose-500/10"
+            loading={loadingComplaints}
+            href="/complaints"
+            actionLabel="View complaints"
+          />
+        </motion.div>
+        {isManagerOrAbove(user) ? (
+          <motion.div {...fadeUp(0.14)} className="col-span-1">
+            <StatCard
+              label="Team Leave Requests"
+              value={loadingTeamLeaves ? '—' : teamPending}
+              sub="awaiting approval"
+              icon={Users}
+              color="text-primary"
+              bg="bg-primary/10"
+              loading={loadingTeamLeaves}
+              href="/leaves/manage"
+              actionLabel="Review now"
+            />
+          </motion.div>
+        ) : (
+          <motion.div {...fadeUp(0.14)} className="col-span-1">
+            <StatCard
+              label="Leaves Filed"
+              value={loadingLeaves ? '—' : myLeaves?.length ?? 0}
+              sub="all time"
+              icon={CheckCircle2}
+              color="text-purple-500"
+              bg="bg-purple-50 dark:bg-purple-500/10"
+              loading={loadingLeaves}
+              href="/leaves"
+              actionLabel="My leaves"
+            />
+          </motion.div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Annual Leave Card */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-5 md:p-6 group hover:border-blue-300 transition-all flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">ANNUAL BALANCE</p>
-              <h2 className="text-3xl md:text-4xl font-black text-slate-900">
-                {loadingLeaves ? <Loader2 className="w-8 h-8 animate-spin text-primary" /> : <>{annualRemaining} <span className="text-lg text-muted-foreground italic">DAYS</span></>}
-              </h2>
-            </div>
-            <div className="p-3 rounded-2xl bg-blue-50 text-blue-500 group-hover:scale-110 transition-transform">
-              <Calendar className="w-5 h-5 md:w-6 md:h-6" />
-            </div>
-          </div>
-          <div className="mt-6">
-            <Link to="/leaves" className="w-full sm:w-auto inline-flex items-center justify-center py-2.5 px-5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10">
-              BOOK ANNUAL
+      {/* ── Middle row: Leave balances + Quick actions ──────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+        {/* Leave balance overview (deduplicated — only shows here) */}
+        <motion.div {...fadeUp(0.15)} className="lg:col-span-3 card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Leave Balance Overview</h2>
+            <Link to="/leaves" className="text-xs font-medium text-primary hover:opacity-80 flex items-center gap-1">
+              Apply <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
+          {loadingLeaves ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-7" />)}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {leaveBars.map(b => (
+                <LeaveBar key={b.label} {...b} />
+              ))}
+            </div>
+          )}
         </motion.div>
 
-        {/* Sick Leave Card */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-panel p-5 md:p-6 group hover:border-rose-300 transition-all flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">SICK BALANCE</p>
-              <h2 className="text-3xl md:text-4xl font-black text-slate-900">
-                {loadingLeaves ? <Loader2 className="w-8 h-8 animate-spin text-rose-400" /> : <>{sickRemaining} <span className="text-lg text-muted-foreground italic">DAYS</span></>}
-              </h2>
-            </div>
-            <div className="p-3 rounded-2xl bg-rose-50 text-rose-500 group-hover:scale-110 transition-transform">
-              <Clock className="w-5 h-5 md:w-6 md:h-6" />
-            </div>
-          </div>
-          <div className="mt-6">
-            <Link to="/leaves" className="w-full sm:w-auto inline-flex items-center justify-center py-2.5 px-5 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/10">
-              BOOK SICK
-            </Link>
-          </div>
-        </motion.div>
-
-        {/* Team Leaves — only for Manager/HR/Admin */}
-        {isManagerOrAbove(user) && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass-panel p-5 md:p-6 flex flex-col justify-between group hover:border-purple-200 transition-colors sm:col-span-2 lg:col-span-1"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">PENDING TEAM LEAVES</p>
-                <h2 className="text-3xl md:text-4xl font-black text-slate-900 tabular-nums">
-                   {loadingTeamLeaves ? <Loader2 className="w-8 h-8 animate-spin text-purple-400" /> : teamLeavesCount}
-                </h2>
-              </div>
-              <div className="p-3 rounded-2xl bg-purple-50 text-purple-400 group-hover:scale-110 transition-transform">
-                <Users className="w-5 h-5 md:w-6 md:h-6" />
-              </div>
-            </div>
-            <div className="mt-6">
-              <Link to="/leaves/manage" className="w-full sm:w-auto inline-flex items-center justify-center py-2.5 px-5 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-600/10">
-                REVIEW REQUESTS
+        {/* Quick actions */}
+        <motion.div {...fadeUp(0.18)} className="lg:col-span-2 card p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-2.5">
+            {quickActions.map((action) => (
+              <Link key={action.path} to={action.path}>
+                <motion.div
+                  whileHover={{ y: -2, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex flex-col items-center gap-2.5 p-3.5 rounded-xl border border-border hover:border-primary/20 bg-background hover:bg-secondary/50 transition-colors cursor-pointer text-center"
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${action.bg}`}>
+                    <action.icon className={`w-4.5 h-4.5 ${action.color}`} style={{ width: 18, height: 18 }} />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground leading-tight">{action.title}</span>
+                </motion.div>
               </Link>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ── Bottom: Activity tables ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* My complaints */}
+        <motion.div {...fadeUp(0.22)} className="table-wrapper">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">Recent Complaints</h2>
+            <Link to="/complaints" className="text-xs font-medium text-primary hover:opacity-80 flex items-center gap-1">
+              All complaints <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="p-3 space-y-2">
+            {loadingComplaints ? (
+              [1, 2, 3].map(i => <Skeleton key={i} className="h-14" />)
+            ) : !myComplaints?.length ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                <Flag className="w-6 h-6 mx-auto mb-2 opacity-30" />
+                No complaints filed yet
+              </div>
+            ) : (
+              myComplaints.slice(0, 4).map((comp: any) => (
+                <div key={comp.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-secondary/60 transition-colors">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{comp.title}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">#{comp.id.substring(0, 8)}</p>
+                  </div>
+                  <StatusBadge status={comp.status} />
+                </div>
+              ))
+            )}
+          </div>
+        </motion.div>
+
+        {/* Team leave requests (managers) / My leave history (employees) */}
+        {isManagerOrAbove(user) ? (
+          <motion.div {...fadeUp(0.25)} className="table-wrapper">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">Pending Team Requests</h2>
+              <Link to="/leaves/manage" className="text-xs font-medium text-primary hover:opacity-80 flex items-center gap-1">
+                Manage all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-secondary/50">
+                    <th className="table-header py-2.5 px-4 text-left">Employee</th>
+                    <th className="table-header py-2.5 px-4 text-left">Type</th>
+                    <th className="table-header py-2.5 px-4 text-left">Dates</th>
+                    <th className="table-header py-2.5 px-4 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingTeamLeaves && (
+                    <tr><td colSpan={4} className="py-10 text-center">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary mx-auto" />
+                    </td></tr>
+                  )}
+                  {!loadingTeamLeaves && !teamLeaves?.length && (
+                    <tr><td colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                      <CheckCircle2 className="w-6 h-6 mx-auto mb-2 opacity-30" />
+                      All caught up — no pending requests
+                    </td></tr>
+                  )}
+                  {teamLeaves?.slice(0, 5).map((leave: any) => (
+                    <tr key={leave.id} className="table-row">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                            {(leave.employee_id || '??').substring(0, 2).toUpperCase()}
+                          </div>
+                          <span className="text-xs font-medium text-foreground">{leave.employee_id}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-xs text-muted-foreground capitalize">{leave.leave_type}</td>
+                      <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">
+                        {leave.start_date}<br />{leave.end_date}
+                      </td>
+                      <td className="py-3 px-4"><StatusBadge status="pending" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        ) : (
+          /* Employee: My leave history */
+          <motion.div {...fadeUp(0.25)} className="table-wrapper">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">My Leave History</h2>
+              <Link to="/leaves" className="text-xs font-medium text-primary hover:opacity-80 flex items-center gap-1">
+                Apply leave <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-secondary/50">
+                    <th className="table-header py-2.5 px-4 text-left">Type</th>
+                    <th className="table-header py-2.5 px-4 text-left">Dates</th>
+                    <th className="table-header py-2.5 px-4 text-left">Days</th>
+                    <th className="table-header py-2.5 px-4 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingLeaves && (
+                    <tr><td colSpan={4} className="py-10 text-center">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary mx-auto" />
+                    </td></tr>
+                  )}
+                  {!loadingLeaves && !myLeaves?.length && (
+                    <tr><td colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                      <Calendar className="w-6 h-6 mx-auto mb-2 opacity-30" />
+                      No leave applications yet
+                    </td></tr>
+                  )}
+                  {myLeaves?.slice(0, 5).map((leave: any) => (
+                    <tr key={leave.id} className="table-row">
+                      <td className="py-3 px-4 text-xs font-medium text-foreground capitalize">{leave.leave_type}</td>
+                      <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">
+                        {leave.start_date}<br />{leave.end_date}
+                      </td>
+                      <td className="py-3 px-4 text-xs font-semibold text-foreground">
+                        {calcDays(leave.start_date, leave.end_date)}d
+                      </td>
+                      <td className="py-3 px-4"><StatusBadge status={leave.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </motion.div>
         )}
       </div>
 
-      {/* Quick Actions */}
-      <div>
-        <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-4">QUICK ACTIONS</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-          {quickActions.map((action, i) => (
-            <Link key={i} to={action.path}>
-              <motion.div 
-                whileHover={{ y: -5 }}
-                className="glass-panel p-5 md:p-6 flex flex-col items-center justify-center gap-4 text-center cursor-pointer hover:shadow-2xl hover:bg-white transition-all border border-transparent hover:border-primary/20"
-              >
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-primary/5 flex items-center justify-center">
-                  <action.icon className={`w-5 h-5 md:w-6 md:h-6 ${action.color}`} />
-                </div>
-                <span className="text-[10px] md:text-xs font-black tracking-widest uppercase text-slate-700">{action.title}</span>
-              </motion.div>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        {/* Team Leave Overview — Manager/HR/Admin */}
-        {isManagerOrAbove(user) && (
-          <div className="glass-panel overflow-hidden border border-white/40">
-            <div className="p-5 border-b border-white/20 bg-white/30 flex items-center justify-between">
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">TEAM LEAVE REQUESTS</h3>
-              <Link to="/leaves/manage" className="text-[10px] font-bold text-primary hover:underline uppercase">View All</Link>
-            </div>
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full min-w-[500px]">
-                <thead>
-                  <tr className="bg-white/40">
-                    <th className="py-3 px-5 text-left text-[10px] font-black uppercase tracking-wider text-muted-foreground italic">Employee</th>
-                    <th className="py-3 px-5 text-left text-[10px] font-black uppercase tracking-wider text-muted-foreground italic">Dates</th>
-                    <th className="py-3 px-5 text-left text-[10px] font-black uppercase tracking-wider text-muted-foreground italic">Type</th>
-                    <th className="py-3 px-5 text-left text-[10px] font-black uppercase tracking-wider text-muted-foreground italic">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                  {loadingTeamLeaves && <tr><td colSpan={4} className="py-12 text-center text-primary"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>}
-                  {!loadingTeamLeaves && teamLeaves?.length === 0 && <tr><td colSpan={4} className="py-12 text-center text-muted-foreground font-medium uppercase tracking-widest text-[10px]">No pending team leaves</td></tr>}
-                  
-                  {teamLeaves?.slice(0, 5).map((leave: any) => (
-                     <tr key={leave.id} className="hover:bg-white/40 transition-colors group">
-                       <td className="py-4 px-5">
-                         <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center text-xs font-black text-primary">
-                             {(leave.employee_id || '').substring(0, 2).toUpperCase()}
-                           </div>
-                           <span className="font-bold text-xs text-slate-700 truncate max-w-[120px]">{leave.employee_id}</span>
-                         </div>
-                       </td>
-                       <td className="py-4 px-5 text-slate-500 text-[10px] font-bold italic">{leave.start_date} <br/> {leave.end_date}</td>
-                       <td className="py-4 px-5 text-xs font-bold uppercase text-slate-600">{leave.leave_type}</td>
-                       <td className="py-4 px-5">
-                         <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-600 border border-amber-100/50">
-                           <Clock className="w-3 h-3" /> PENDING
-                         </span>
-                       </td>
-                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      {/* ── Team members (managers only) ────────────────────────── */}
+      {isManagerOrAbove(user) && (
+        <motion.div {...fadeUp(0.28)} className="table-wrapper">
+          <div className="px-5 py-4 border-b border-border">
+            <h2 className="text-sm font-semibold text-foreground">My Team</h2>
           </div>
-        )}
-
-        {/* Team Members List — Manager/HR/Admin */}
-        {isManagerOrAbove(user) && (
-          <div className="glass-panel overflow-hidden border border-white/40 flex flex-col">
-            <div className="p-5 border-b border-white/20 bg-white/30 flex items-center justify-between">
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">MY TEAM MEMBERS</h3>
-            </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar max-h-[320px]">
-              {loadingTeamMembers ? (
-                 <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-              ) : teamMembers?.length === 0 ? (
-                 <div className="py-12 text-center text-muted-foreground font-medium uppercase tracking-widest text-[10px]">No team members found</div>
-              ) : (
-                <div className="divide-y divide-white/10">
-                  {teamMembers?.map((member: any) => (
-                    <div key={member.id} className="p-4 hover:bg-white/40 transition-colors flex items-center justify-between group">
-                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center text-xs font-black text-indigo-600">
-                           {(member.full_name || member.email || '').substring(0, 2).toUpperCase()}
-                         </div>
-                         <div>
-                           <p className="font-bold text-sm text-slate-800 leading-tight">{member.full_name || 'Unknown'}</p>
-                           <p className="text-[10px] text-slate-500 font-bold tracking-wide mt-0.5">{member.email}</p>
-                         </div>
-                       </div>
-                       <div className="text-right">
-                         <span className="inline-block px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest">
-                           {member.department || 'General'}
-                         </span>
-                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* My Complaints */}
-        <div className="glass-panel flex flex-col border border-white/40">
-           <div className="p-5 border-b border-white/20 bg-white/30 flex items-center justify-between">
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">MY RECENT COMPLAINTS</h3>
-              <Link to="/complaints" className="text-[10px] font-bold text-primary hover:underline uppercase">History</Link>
-          </div>
-          <div className="p-5 flex-1 space-y-3">
-            {loadingComplaints ? (
-               <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-            ) : myComplaints?.length === 0 ? (
-               <div className="py-12 text-center text-muted-foreground font-medium uppercase tracking-widest text-[10px]">No active complaints</div>
+          <div className="overflow-x-auto">
+            {loadingTeamMembers ? (
+              <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}</div>
+            ) : !teamMembers?.length ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">No team members found</div>
             ) : (
-               myComplaints?.slice(0, 3).map((comp: any) => (
-                  <div key={comp.id} className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-white/60 hover:border-primary/20 transition-all group">
-                     <div className="flex justify-between items-center mb-2">
-                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.1em]">Complaint ID: {comp.id.substring(0,6)}</span>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${comp.status === 'resolved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${comp.status === 'resolved' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-pulse'}`}></span> {comp.status}
-                        </span>
-                     </div>
-                     <p className="font-bold text-sm text-slate-800 group-hover:text-primary transition-colors">{comp.title}</p>
+              <div className="divide-y divide-border">
+                {teamMembers.slice(0, 8).map((m: any) => (
+                  <div key={m.id} className="flex items-center justify-between px-5 py-3 hover:bg-secondary/40 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
+                        {(m.full_name || m.email || '').substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{m.full_name || 'Unknown'}</p>
+                        <p className="text-xs text-muted-foreground">{m.email}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-medium bg-secondary text-muted-foreground px-2.5 py-1 rounded-lg">
+                      {m.department || 'General'}
+                    </span>
                   </div>
-               ))
+                ))}
+              </div>
             )}
           </div>
-        </div>
-      </div>
+        </motion.div>
+      )}
     </div>
   );
 }

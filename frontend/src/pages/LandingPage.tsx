@@ -1,182 +1,194 @@
 import { motion } from 'framer-motion';
+import type { Easing } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { FileText, ShieldAlert, Bot, ArrowRight, ShieldCheck, Mail, Lock } from 'lucide-react';
-import BackgroundBlobs from '@/components/3d/BackgroundBlobs';
+import { FileText, ShieldAlert, Bot, ArrowRight, ShieldCheck, Mail, Lock, Shield } from 'lucide-react';
+
+const EASE: Easing = 'easeOut';
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5, delay, ease: EASE },
+});
+
+const features = [
+  {
+    icon: FileText,
+    color: 'text-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-500/10',
+    title: 'Automated Leave Management',
+    description: 'Quickly draft and submit formal leave requests. The system automatically processes details and prepares communications for managerial approval.',
+  },
+  {
+    icon: ShieldAlert,
+    color: 'text-rose-500',
+    bg: 'bg-rose-50 dark:bg-rose-500/10',
+    title: 'Secure Complaint Filing',
+    description: 'Report workplace issues through a secure, guided conversational interface, ensuring all documentation is accurately captured.',
+  },
+  {
+    icon: Bot,
+    color: 'text-primary',
+    bg: 'bg-primary/10',
+    title: 'Intelligent AI Retrieval',
+    description: 'Powered by an advanced multi-agent system, the assistant instantly retrieves exact company policies to answer your questions in real-time.',
+  },
+];
 
 export default function LandingPage() {
   const navigate = useNavigate();
 
-  const features = [
-    {
-      icon: <FileText className="w-8 h-8 text-blue-500" />,
-      title: 'Automated Leave Management',
-      description: 'Quickly draft and submit formal leave requests. The system automatically processes the necessary details and prepares the communications required for managerial approval.'
-    },
-    {
-      icon: <ShieldAlert className="w-8 h-8 text-rose-500" />,
-      title: 'Secure Complaint Filing',
-      description: 'Report workplace issues or HR complaints through a secure, guided conversational interface, ensuring all necessary documentation is accurately captured.'
-    },
-    {
-      icon: <Bot className="w-8 h-8 text-emerald-500" />,
-      title: 'Intelligent AI Retrieval',
-      description: 'Powered by an advanced multi-agent system, the assistant instantly retrieves exact company policies and HR guidelines to answer your questions accurately and in real-time.'
-    }
-  ];
-
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden font-sans text-slate-900 flex flex-col">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#E2E8F0]/50 to-[#93C5FD]/30 pointer-events-none z-0" />
-      <BackgroundBlobs />
-
-      {/* Main Content */}
-      <main className="flex-1 relative z-10 flex flex-col">
-        
-        {/* Hero Section */}
-        <section className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center max-w-5xl mx-auto min-h-[70vh]">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Top Nav */}
+      <header className="h-14 px-6 md:px-10 flex items-center justify-between border-b border-border bg-card sticky top-0 z-30">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
+            <Shield className="w-4 h-4" />
+          </div>
+          <span className="font-bold text-base tracking-tight text-foreground">Apex HR</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden md:block">Privacy</Link>
+          <button
+            onClick={() => navigate('/login')}
+            className="btn-primary"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100/80 text-blue-800 text-sm font-semibold mb-6 shadow-sm border border-blue-200 backdrop-blur-sm">
-              <Bot className="w-4 h-4" />
-              <span>Enterprise-grade HR Solution</span>
+            Sign in <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        {/* Hero */}
+        <section className="max-w-5xl mx-auto px-6 py-24 text-center">
+          <motion.div {...fadeUp(0)}>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
+              <Bot className="w-3.5 h-3.5" />
+              Enterprise-grade HR Solution
             </div>
-            
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 drop-shadow-sm">
-              Apex HR
-            </h1>
-            
-            <h2 className="text-2xl md:text-3xl font-medium text-slate-700 mb-8 max-w-3xl mx-auto leading-relaxed">
-              Enterprise-grade AI for seamless HR operations.
-            </h2>
-            
-            <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-              Streamline your workflow with intelligent, automated HR management. Apex HR helps employees effortlessly handle leave requests, file secure complaints, and navigate company policies through an advanced multi-agent conversational interface.
-            </p>
-            
-            <button 
-              className="inline-flex items-center justify-center text-white text-lg px-8 py-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-blue-600 hover:bg-blue-700 font-semibold"
+          </motion.div>
+
+          <motion.h1 {...fadeUp(0.1)} className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground mb-5">
+            Apex HR
+          </motion.h1>
+
+          <motion.p {...fadeUp(0.15)} className="text-xl md:text-2xl font-medium text-muted-foreground mb-4 max-w-2xl mx-auto">
+            Enterprise-grade AI for seamless HR operations.
+          </motion.p>
+
+          <motion.p {...fadeUp(0.2)} className="text-base text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+            Streamline your workflow with intelligent, automated HR management. Handle leave requests, file secure complaints, and navigate company policies through an advanced multi-agent interface.
+          </motion.p>
+
+          <motion.div {...fadeUp(0.25)} className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
               onClick={() => navigate('/login')}
+              className="btn-primary px-8 py-3 text-base"
             >
-              Log In | Sign up <ArrowRight className="ml-2 w-5 h-5" />
+              Get started <ArrowRight className="w-5 h-5" />
             </button>
+            <Link to="/privacy" className="btn-ghost px-8 py-3 text-base">
+              Learn more
+            </Link>
           </motion.div>
         </section>
 
-        {/* Features Section */}
-        <section className="py-20 px-6 bg-white/60 backdrop-blur-md border-y border-slate-200">
-          <div className="max-w-7xl mx-auto">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+        {/* Features */}
+        <section className="py-20 px-6 bg-card border-y border-border">
+          <div className="max-w-6xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.6 }}
-              className="text-center mb-16"
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="text-center mb-12"
             >
-              <h3 className="text-3xl font-bold text-slate-900">Core Features</h3>
-              <p className="text-slate-600 mt-4 text-lg max-w-2xl mx-auto">Designed to simplify and accelerate your daily HR interactions.</p>
+              <h2 className="text-3xl font-bold text-foreground mb-3">Core Features</h2>
+              <p className="text-muted-foreground max-w-xl mx-auto">Designed to simplify and accelerate your daily HR interactions.</p>
             </motion.div>
-            
-            <div className="grid md:grid-cols-3 gap-10">
-              {features.map((feature, idx) => (
-                <motion.div 
-                  key={idx}
-                  initial={{ opacity: 0, y: 20 }}
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {features.map((f, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 16 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
-                  transition={{ duration: 0.5, delay: idx * 0.1 }}
-                  className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow"
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: i * 0.1 }}
+                  className="card p-6 hover:shadow-card-md transition-shadow"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-6 shadow-inner">
-                    {feature.icon}
+                  <div className={`w-11 h-11 rounded-xl ${f.bg} flex items-center justify-center mb-4`}>
+                    <f.icon className={`w-5 h-5 ${f.color}`} />
                   </div>
-                  <h4 className="text-xl font-bold text-slate-900 mb-4">{feature.title}</h4>
-                  <p className="text-slate-600 leading-relaxed">{feature.description}</p>
+                  <h3 className="text-base font-semibold text-foreground mb-2">{f.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
                 </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Data Usage / Trust Section */}
-        <section className="py-24 px-6 max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="bg-slate-900 text-white rounded-3xl p-10 md:p-16 shadow-2xl relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none" />
-            
-            <div className="relative z-10">
-              <div className="flex items-center gap-4 mb-8">
-                <ShieldCheck className="w-10 h-10 text-blue-400" />
-                <h3 className="text-3xl md:text-4xl font-bold">Seamless & Secure Integration</h3>
+        {/* Trust section */}
+        <section className="py-20 px-6">
+          <div className="max-w-4xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="card p-10 md:p-14"
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                </div>
+                <h2 className="text-2xl font-bold text-foreground">Seamless &amp; Secure Integration</h2>
               </div>
-              
-              <p className="text-lg text-slate-300 mb-10 leading-relaxed">
+              <p className="text-muted-foreground mb-8 leading-relaxed">
                 To provide these automated HR services, Apex HR requires secure access to your Google Account.
               </p>
-
-              <div className="grid md:grid-cols-2 gap-8 mb-10">
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 mt-1">
-                    <Lock className="w-6 h-6 text-blue-400" />
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                {[
+                  { icon: Lock, title: 'Authentication', desc: 'We use Google OAuth to securely verify your identity without storing separate passwords.' },
+                  { icon: Mail, title: 'Email Automation', desc: 'With your explicit permission, the assistant uses your Gmail strictly to send drafted HR communications on your behalf.' },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <item.icon className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-1">{item.title}</h3>
+                      <p className="text-sm text-muted-foreground">{item.desc}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xl font-semibold mb-2">Authentication</h4>
-                    <p className="text-slate-400">We use Google OAuth to securely verify your identity without storing separate passwords.</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 mt-1">
-                    <Mail className="w-6 h-6 text-blue-400" />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-semibold mb-2">Email Automation</h4>
-                    <p className="text-slate-400">With your explicit permission, the assistant utilizes your Gmail account strictly to send drafted HR communications—such as official leave requests and internal complaints—directly to the relevant departments on your behalf.</p>
-                  </div>
-                </div>
+                ))}
               </div>
-
-              <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700/50">
-                <p className="text-sm text-slate-400 leading-relaxed">
-                  <strong className="text-slate-300">Note:</strong> Your data is never used for marketing, and our system architecture strictly adheres to Google's API Services User Data Policy, including the Limited Use requirements.
+              <div className="p-4 rounded-xl bg-secondary border border-border">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  <strong className="text-foreground">Note:</strong> Your data is never used for marketing. Our architecture strictly adheres to Google's API Services User Data Policy, including Limited Use requirements.
                 </p>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </section>
-
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-slate-200 bg-white/80 backdrop-blur-md py-8 px-6 mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="text-center md:text-left">
-            <p className="text-slate-900 font-semibold mb-1">Apex HR</p>
-            <p className="text-sm text-slate-500">Developed by Mohamed Atheeq</p>
+      <footer className="border-t border-border bg-card py-6 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-primary flex items-center justify-center text-white">
+              <Shield className="w-3 h-3" />
+            </div>
+            <span className="text-sm font-semibold text-foreground">Apex HR</span>
+            <span className="text-xs text-muted-foreground ml-1">by Mohamed Atheeq</span>
           </div>
-          
-          <div className="flex flex-wrap justify-center gap-6 text-sm font-medium">
-            <a href="mailto:mohamedatheeq0@gmail.com" className="text-slate-600 hover:text-blue-600 transition-colors">
-              Contact Support
-            </a>
-            <Link to="/privacy" className="text-slate-600 hover:text-blue-600 transition-colors">
-              Privacy Policy
-            </Link>
-            <Link to="/terms" className="text-slate-600 hover:text-blue-600 transition-colors">
-              Terms of Service
-            </Link>
+          <div className="flex gap-5 text-sm text-muted-foreground">
+            <a href="mailto:mohamedatheeq0@gmail.com" className="hover:text-foreground transition-colors">Support</a>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
           </div>
-          
-          <div className="text-sm text-slate-500 text-center md:text-right">
-            © 2026 Apex HR.<br className="hidden md:block" /> All rights reserved.
-          </div>
+          <p className="text-xs text-muted-foreground">© 2026 Apex HR. All rights reserved.</p>
         </div>
       </footer>
     </div>

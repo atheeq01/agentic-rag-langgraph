@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,87 +6,208 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    /* ── Brand ── */
+    --primary: 14 90% 53%;         /* #E84C2C orange-red */
+    --primary-foreground: 0 0% 100%;
+
+    /* ── Layout ── */
+    --background: 40 10% 95%;      /* #F2F1EE warm gray */
+    --foreground: 0 0% 7%;         /* #111111 */
+
+    /* ── Cards / Surfaces ── */
+    --card: 0 0% 100%;             /* #FFFFFF */
+    --card-foreground: 0 0% 7%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 252 83% 66%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
+    --popover-foreground: 0 0% 7%;
+
+    /* ── Semantic ── */
+    --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 50%;
+    --accent: 14 90% 97%;
+    --accent-foreground: 14 90% 40%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+
+    /* ── Chrome ── */
+    --border: 0 0% 90%;            /* #E5E5E5 */
+    --input: 0 0% 90%;
+    --ring: 14 90% 53%;
     --radius: 0.75rem;
+  }
+
+  .dark {
+    --primary: 14 90% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --background: 240 5% 9%;       /* #161617 */
+    --foreground: 210 20% 92%;
+
+    --card: 240 5% 12%;            /* #1C1C1E */
+    --card-foreground: 210 20% 92%;
+    --popover: 240 5% 12%;
+    --popover-foreground: 210 20% 92%;
+
+    --secondary: 240 5% 16%;
+    --secondary-foreground: 210 20% 92%;
+    --muted: 240 5% 16%;
+    --muted-foreground: 210 10% 55%;
+    --accent: 14 60% 20%;
+    --accent-foreground: 14 90% 70%;
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 210 20% 92%;
+
+    --border: 240 5% 20%;
+    --input: 240 5% 20%;
+    --ring: 14 90% 58%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  * { @apply border-border; }
+
+  html, body {
+    font-family: 'Inter', sans-serif;
   }
+
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary font-sans;
+    @apply bg-background text-foreground antialiased;
+    background-color: hsl(var(--background));
   }
-  h1 { @apply text-2xl md:text-3xl lg:text-4xl; }
-  h2 { @apply text-xl md:text-2xl lg:text-3xl; }
-  h3 { @apply text-lg md:text-xl lg:text-2xl; }
+
+  h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif; font-weight: 700; }
 }
 
+/* ── Card ─────────────────────────────────────────────────── */
+.card {
+  @apply bg-card text-card-foreground rounded-2xl border border-border shadow-sm;
+}
+
+/* ── Glass (used only in auth / landing) ──────────────────── */
 .glass-panel {
-  @apply bg-white/60 backdrop-blur-md border border-white/40 shadow-xl rounded-2xl;
+  @apply bg-white/70 dark:bg-white/5 backdrop-blur-xl border border-border rounded-2xl shadow-sm;
 }
 
-@layer components {
-  .custom-select {
-    @apply appearance-none bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 1.25rem center;
-    background-size: 1.1rem;
-    padding-right: 3rem;
-  }
+/* ── Status badges ─────────────────────────────────────────── */
+.badge {
+  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold;
+}
+.badge-pending  { @apply bg-amber-50  text-amber-700  dark:bg-amber-900/30  dark:text-amber-400; }
+.badge-approved { @apply bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
+.badge-rejected { @apply bg-rose-50   text-rose-700   dark:bg-rose-900/30   dark:text-rose-400; }
+.badge-resolved { @apply bg-blue-50   text-blue-700   dark:bg-blue-900/30   dark:text-blue-400; }
+.badge-open     { @apply bg-orange-50  text-orange-700 dark:bg-orange-900/30 dark:text-orange-400; }
 
-  .custom-select-inline {
-    @apply appearance-none bg-white/40 border border-white/20 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-white/80;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 0.8rem;
-    padding-right: 2rem;
-  }
+/* ── Input ─────────────────────────────────────────────────── */
+.input {
+  @apply w-full bg-white dark:bg-white/5 border border-border rounded-xl px-4 py-3 text-sm
+         outline-none transition-all
+         focus:ring-2 focus:ring-primary/20 focus:border-primary/50
+         placeholder:text-muted-foreground/60;
 }
 
-.page-container {
-  @apply w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8;
+input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+/* ── Primary button ────────────────────────────────────────── */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl
+         bg-primary text-primary-foreground text-sm font-semibold
+         hover:opacity-90 active:scale-[0.98] transition-all shadow-sm;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-transparent;
+/* ── Ghost button ──────────────────────────────────────────── */
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl
+         text-sm font-medium text-muted-foreground
+         hover:bg-secondary hover:text-foreground transition-all;
 }
 
+/* ── Page header ───────────────────────────────────────────── */
+.page-header {
+  @apply mb-6;
+}
+.page-title {
+  @apply text-2xl font-bold text-foreground tracking-tight;
+}
+.page-subtitle {
+  @apply text-sm text-muted-foreground mt-1;
+}
+
+/* ── Table ─────────────────────────────────────────────────── */
+.table-wrapper {
+  @apply card overflow-hidden;
+}
+.table-header {
+  @apply text-[11px] font-semibold text-muted-foreground uppercase tracking-wider;
+}
+.table-row {
+  @apply border-t border-border hover:bg-secondary/50 transition-colors;
+}
+
+/* ── Scrollbars ────────────────────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
+  @apply bg-border rounded-full;
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Select ────────────────────────────────────────────────── */
+.custom-select {
+  @apply input appearance-none cursor-pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1rem;
+  padding-right: 3rem;
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+.custom-select-inline {
+  @apply appearance-none bg-secondary border border-border rounded-lg px-3 py-1.5
+         text-xs font-medium outline-none focus:ring-2 focus:ring-primary/20
+         transition-all cursor-pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.75rem;
+  padding-right: 2rem;
 }
 
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+/* ── Stat card ─────────────────────────────────────────────── */
+.stat-card {
+  @apply card p-6 flex flex-col gap-4;
 }
+
+.stat-card-accent {
+  @apply rounded-2xl p-6 flex flex-col gap-4 text-white;
+  background: linear-gradient(135deg, hsl(14,90%,53%), hsl(14,90%,42%));
+}
+
+/* ── Animations ────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.animate-fade-up { animation: fadeUp .35s ease both; }
+
+@keyframes shimmer {
+  from { transform: translateX(-100%) skewX(-12deg); }
+  to   { transform: translateX(200%) skewX(-12deg); }
+}
+.animate-shimmer { animation: shimmer 1.5s ease infinite; }
+
+/* stagger helpers */
+.delay-75  { animation-delay: 75ms;  }
+.delay-150 { animation-delay: 150ms; }
+.delay-225 { animation-delay: 225ms; }
+.delay-300 { animation-delay: 300ms; }

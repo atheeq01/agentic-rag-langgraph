@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  MessageSquareWarning, 
-  FileText, 
-  Bot, 
-  Settings, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  CalendarDays,
+  CalendarCheck,
+  MessageSquareWarning,
+  ClipboardList,
+  FileText,
+  Bot,
+  Settings,
+  LogOut,
   Shield,
-  X
+  type LucideProps,
 } from 'lucide-react';
 import { useUIStore, useAuthStore, type UserRole } from '@/store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,50 +19,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 type NavItem = {
   name: string;
   path: string;
-  icon: any;
+  icon: React.FC<LucideProps>;
   roles?: UserRole[];
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'My Leaves', path: '/leaves', icon: Calendar },
-  { name: 'Manage Leaves', path: '/leaves/manage', icon: Calendar, roles: ['manager', 'hr', 'admin'] },
-  { name: 'My Complaints', path: '/complaints', icon: MessageSquareWarning },
-  { name: 'Manage Complaints', path: '/complaints/manage', icon: MessageSquareWarning, roles: ['hr', 'admin'] },
-  { name: 'Documents', path: '/documents', icon: FileText, roles: ['hr', 'admin'] },
-  { name: 'AI Chat', path: '/ai-chat', icon: Bot },
-  { name: 'Settings', path: '/settings', icon: Settings },
+  { name: 'Dashboard',          path: '/dashboard',        icon: LayoutDashboard },
+  { name: 'My Leaves',          path: '/leaves',           icon: CalendarDays },
+  { name: 'Manage Leaves',      path: '/leaves/manage',    icon: CalendarCheck,         roles: ['manager', 'hr', 'admin'] },
+  { name: 'My Complaints',      path: '/complaints',       icon: MessageSquareWarning },
+  { name: 'Manage Complaints',  path: '/complaints/manage',icon: ClipboardList,         roles: ['hr', 'admin'] },
+  { name: 'Documents',          path: '/documents',        icon: FileText,              roles: ['hr', 'admin'] },
+  { name: 'AI Chat',            path: '/ai-chat',          icon: Bot },
+  { name: 'Settings',           path: '/settings',         icon: Settings },
 ];
-
-const ROLE_COLORS: Record<string, string> = {
-  employee: 'bg-blue-500/20 text-blue-700',
-  manager: 'bg-purple-500/20 text-purple-700',
-  hr: 'bg-emerald-500/20 text-emerald-700',
-  admin: 'bg-rose-500/20 text-rose-700',
-};
 
 export default function Sidebar() {
   const { isSidebarOpen, toggleSidebar } = useUIStore();
   const location = useLocation();
   const user = useAuthStore(state => state.user);
   const logout = useAuthStore(state => state.logout);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-  useEffect(() => {
-    const handleResize = () => {
-      const currentlyMobile = window.innerWidth < 768;
-      
-      // If we are moving from mobile to desktop, and the sidebar is closed, force it open
-      if (isMobile && !currentlyMobile && !isSidebarOpen) {
-        toggleSidebar();
-      }
-      
-      setIsMobile(currentlyMobile);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isMobile, isSidebarOpen, toggleSidebar]);
 
   const visibleNavItems = NAV_ITEMS.filter(item => {
     if (!item.roles) return true;
@@ -75,104 +52,109 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile Overlay backdrop */}
+      {/* Mobile backdrop */}
       <AnimatePresence>
-        {isSidebarOpen && isMobile && (
+        {isSidebarOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={toggleSidebar}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[40] md:hidden"
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden"
           />
         )}
       </AnimatePresence>
 
-      <motion.aside
-        initial={false}
-        animate={{
-          width: isSidebarOpen ? 260 : (isMobile ? 260 : 80),
-          x: isSidebarOpen ? 0 : (isMobile ? "-110%" : 0),
-        }}
-        transition={{ duration: 0.3 }}
+      {/* ── Icon Rail ─────────────────────────────────────────── */}
+      <aside
         className={cn(
-          "h-[calc(100vh-2rem)] rounded-3xl glass-panel flex flex-col overflow-hidden shrink-0 z-50",
-          "fixed inset-y-0 left-0 m-4 border-white/50 shadow-2xl"
+          // base
+          "fixed inset-y-0 left-0 z-50 flex flex-col items-center py-5 gap-1",
+          "bg-card border-r border-border",
+          // width: 64px desktop always visible, mobile hidden unless open
+          "w-16",
+          // mobile: slide in/out
+          "transition-transform duration-300",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
-        <div className="p-6 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white shadow-lg shadow-primary/20 shrink-0">
-              <Shield className="w-6 h-6" />
-            </div>
-            {isSidebarOpen && (
-              <motion.span 
-                initial={{ opacity: 0, x: -10 }} 
-                animate={{ opacity: 1, x: 0 }} 
-                className="font-black text-xl tracking-tighter text-slate-900 uppercase"
-              >
-                ApexHR
-              </motion.span>
-            )}
+        {/* Brand mark */}
+        <div className="mb-4 flex flex-col items-center gap-1">
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm">
+            <Shield className="w-4 h-4" />
           </div>
-          <button onClick={toggleSidebar} className="md:hidden p-2 hover:bg-slate-100 rounded-xl transition-colors">
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto no-scrollbar">
+        {/* Divider */}
+        <div className="w-8 h-px bg-border mb-2" />
+
+        {/* Nav icons */}
+        <nav className="flex-1 flex flex-col items-center gap-1 w-full px-2">
           {visibleNavItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const Icon = item.icon;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => {
-                  if (isMobile) toggleSidebar();
-                }}
+                onClick={() => { if (window.innerWidth < 768) toggleSidebar(); }}
+                title={item.name}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300",
-                  isActive 
-                    ? "bg-white/60 text-primary shadow-sm font-bold" 
-                    : "text-foreground/70 hover:bg-white/40 hover:text-foreground"
+                  "relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200 group",
+                  isActive
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
-                <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-primary" : "text-foreground/50")} />
-                {isSidebarOpen && <span className="truncate">{item.name}</span>}
+                <Icon className="w-[18px] h-[18px]" />
+
+                {/* Tooltip */}
+                <span className={cn(
+                  "absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap z-50",
+                  "bg-foreground text-background shadow-lg",
+                  "pointer-events-none opacity-0 group-hover:opacity-100",
+                  "transition-opacity duration-150 -translate-y-1/2 top-1/2"
+                )}>
+                  {item.name}
+                </span>
               </Link>
             );
           })}
         </nav>
-        
-        {/* User Profile + Logout */}
-        <div className="p-4 mt-auto border-t border-white/20">
-          {isSidebarOpen && user && (
-            <div className="p-3 rounded-xl bg-white/40 border border-white/20 flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/80 to-purple-400 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                {initials}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-semibold truncate">{user.name}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full w-fit font-bold flex items-center gap-1 ${ROLE_COLORS[user.role] || ROLE_COLORS.employee}`}>
-                  <Shield className="w-3 h-3" />
-                  {user.role.toUpperCase()}
-                </span>
-              </div>
+
+        {/* Bottom: user + logout */}
+        <div className="flex flex-col items-center gap-2 w-full px-2">
+          <div className="w-8 h-px bg-border" />
+
+          {/* User avatar tooltip */}
+          <div
+            title={user?.name ?? ''}
+            className="relative w-10 h-10 flex items-center justify-center group cursor-default"
+          >
+            <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold">
+              {initials}
             </div>
-          )}
-          
+            <span className={cn(
+              "absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap z-50",
+              "bg-foreground text-background shadow-lg",
+              "pointer-events-none opacity-0 group-hover:opacity-100",
+              "transition-opacity duration-150 -translate-y-1/2 top-1/2"
+            )}>
+              {user?.name ?? 'Account'}<br/>
+              <span className="opacity-60 font-normal capitalize">{user?.role}</span>
+            </span>
+          </div>
+
+          {/* Logout */}
           <button
             onClick={logout}
-            className={cn(
-              "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 text-rose-500 hover:bg-rose-50/60 w-full",
-              !isSidebarOpen && "justify-center"
-            )}
+            title="Logout"
+            className="w-10 h-10 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10 transition-all"
           >
-            <LogOut className="w-5 h-5 shrink-0" />
-            {isSidebarOpen && <span className="font-bold text-sm">Logout</span>}
+            <LogOut className="w-[18px] h-[18px]" strokeWidth={2} />
           </button>
         </div>
-      </motion.aside>
+      </aside>
     </>
   );
 }
