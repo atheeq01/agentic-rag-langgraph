@@ -126,7 +126,6 @@ jobs:
       - name: Deploy to Firebase Hosting (live)
         working-directory: ./frontend
         run: |
-          export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
           npx firebase-tools deploy --only hosting --project ${{ vars.GCP_PROJECT_ID }} --non-interactive
 
       - name: Update FRONTEND_URL to Latest
@@ -169,7 +168,6 @@ jobs:
       - name: Deploy to Firebase Hosting (preview)
         working-directory: ./frontend
         run: |
-          export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
           npx firebase-tools hosting:channel:deploy pr-${{ github.event.number }} \
             --project ${{ vars.GCP_PROJECT_ID }} \
             --expires 7d
