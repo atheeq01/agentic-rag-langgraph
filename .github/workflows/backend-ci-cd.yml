@@ -121,6 +121,13 @@ jobs:
           echo "✅ Backend deployed to: $URL"
           echo "backend_url=$URL" >> $GITHUB_OUTPUT
 
+      - name: Store Backend URL in Secret Manager
+        run: |
+          URL=${{ steps.get_url.outputs.backend_url }}
+          gcloud secrets delete BACKEND_URL --project ${{ vars.GCP_PROJECT_ID }} --quiet || true
+          gcloud secrets create BACKEND_URL --replication-policy="automatic" --project ${{ vars.GCP_PROJECT_ID }}
+          echo -n "$URL" | gcloud secrets versions add BACKEND_URL --data-file=- --project ${{ vars.GCP_PROJECT_ID }} --quiet
+
       - name: Trigger Frontend Redeploy
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
