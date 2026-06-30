@@ -61,8 +61,13 @@ jobs:
           if [ -n "${{ inputs.backend_url }}" ]; then
             echo "api_url=${{ inputs.backend_url }}" >> $GITHUB_OUTPUT
           else
-            URL=$(gcloud secrets versions access latest --secret=BACKEND_URL --project=${{ vars.GCP_PROJECT_ID }})
-            echo "api_url=$URL" >> $GITHUB_OUTPUT
+            URL=$(gcloud secrets versions access latest --secret=BACKEND_URL --project=${{ vars.GCP_PROJECT_ID }} 2>/dev/null || true)
+            if [ -n "$URL" ]; then
+              echo "api_url=$URL" >> $GITHUB_OUTPUT
+            else
+              echo "BACKEND_URL secret not found, falling back to VITE_API_URL secret"
+              echo "api_url=${{ secrets.VITE_API_URL }}" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Install dependencies
