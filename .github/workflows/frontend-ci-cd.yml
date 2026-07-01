@@ -125,10 +125,19 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
+      - name: Write Firebase deploy service account key
+        run: echo "${{ secrets.FIREBASE_DEPLOY_SA_KEY_B64 }}" | base64 -d > "${{ github.workspace }}/firebase-deploy-sa-key.json"
+
       - name: Deploy to Firebase Hosting (live)
         working-directory: ./frontend
         run: |
           npx firebase-tools@15.22.1 deploy --only hosting --project ${{ vars.GCP_PROJECT_ID }} --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-deploy-sa-key.json
+
+      - name: Remove Firebase deploy service account key
+        if: always()
+        run: rm -f "${{ github.workspace }}/firebase-deploy-sa-key.json"
 
       - name: Update FRONTEND_URL to Latest
         run: |
@@ -168,9 +177,18 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
+      - name: Write Firebase deploy service account key
+        run: echo "${{ secrets.FIREBASE_DEPLOY_SA_KEY_B64 }}" | base64 -d > "${{ github.workspace }}/firebase-deploy-sa-key.json"
+
       - name: Deploy to Firebase Hosting (preview)
         working-directory: ./frontend
         run: |
           npx firebase-tools@15.22.1 hosting:channel:deploy pr-${{ github.event.number }} \
             --project ${{ vars.GCP_PROJECT_ID }} \
             --expires 7d
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-deploy-sa-key.json
+
+      - name: Remove Firebase deploy service account key
+        if: always()
+        run: rm -f "${{ github.workspace }}/firebase-deploy-sa-key.json"
