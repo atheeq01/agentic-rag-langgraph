@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { api } from '@/lib/api';
 
 export type UserRole = 'employee' | 'manager' | 'hr' | 'admin';
 
@@ -36,10 +37,7 @@ export const useAuthStore = create<AuthState>()(
       login: (token, user) => set({ isAuthenticated: true, token, user }),
       logout: async () => {
         try {
-          await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/logout`, {
-            method: 'POST',
-            credentials: 'include',
-          });
+          await api.post('/auth/logout');
         } catch (e) {
           console.error("Logout failed", e);
         }
