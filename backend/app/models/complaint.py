@@ -25,6 +25,8 @@ class Complaint(Base):
     resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     user = relationship(
         "User",
@@ -36,4 +38,10 @@ class Complaint(Base):
         "User",
         foreign_keys=[against_user_id],
         back_populates="complaints_received"
+    )
+
+    resolved_by_user = relationship(
+        "User",
+        foreign_keys=[resolved_by_id],
+        back_populates="complaints_resolved"
     )

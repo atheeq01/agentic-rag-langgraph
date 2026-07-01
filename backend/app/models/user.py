@@ -61,6 +61,11 @@ class User(Base):
         back_populates="against_user",
         foreign_keys="[Complaint.against_user_id]"
     )
+    complaints_resolved = relationship(
+        "Complaint",
+        back_populates="resolved_by_user",
+        foreign_keys="[Complaint.resolved_by_id]"
+    )
     password_history: Mapped[list["PasswordHistory"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan"
