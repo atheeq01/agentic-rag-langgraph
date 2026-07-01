@@ -51,6 +51,7 @@ jobs:
           project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
@@ -113,14 +114,20 @@ jobs:
           path: frontend/dist
 
       - name: Authenticate to Google Cloud
+        id: auth
         uses: google-github-actions/auth@v3
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
+
+      - name: Update ADC for Firebase CLI
+        run: |
+          gcloud auth login --quiet --cred-file="$GOOGLE_APPLICATION_CREDENTIALS" --update-adc
 
       - name: Deploy to Firebase Hosting (live)
         working-directory: ./frontend
@@ -154,14 +161,20 @@ jobs:
           path: frontend/dist
 
       - name: Authenticate to Google Cloud
+        id: auth
         uses: google-github-actions/auth@v3
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
+
+      - name: Update ADC for Firebase CLI
+        run: |
+          gcloud auth login --quiet --cred-file="$GOOGLE_APPLICATION_CREDENTIALS" --update-adc
 
       - name: Deploy to Firebase Hosting (preview)
         working-directory: ./frontend
