@@ -128,8 +128,20 @@ jobs:
 
       - name: Deploy to Firebase Hosting (live)
         working-directory: ./frontend
+        env:
+          FIREBASE_SA_KEY_B64: ${{ secrets.FIREBASE_DEPLOY_SA_KEY_B64 }}
         run: |
+          # Decode the Base64 Service Account key into a temporary JSON file
+          echo "$FIREBASE_SA_KEY_B64" | base64 -d > firebase-credentials.json
+
+          # Force Firebase to use this specific JSON file for authentication
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/firebase-credentials.json"
+
+          # Run the deploy command
           npx firebase-tools@15.22.1 deploy --only hosting --project ${{ vars.GCP_PROJECT_ID }} --non-interactive
+
+          # Clean up the key
+          rm firebase-credentials.json
 
       - name: Update FRONTEND_URL to Latest
         run: |
@@ -172,7 +184,19 @@ jobs:
 
       - name: Deploy to Firebase Hosting (preview)
         working-directory: ./frontend
+        env:
+          FIREBASE_SA_KEY_B64: ${{ secrets.FIREBASE_DEPLOY_SA_KEY_B64 }}
         run: |
+          # Decode the Base64 Service Account key into a temporary JSON file
+          echo "$FIREBASE_SA_KEY_B64" | base64 -d > firebase-credentials.json
+
+          # Force Firebase to use this specific JSON file for authentication
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/firebase-credentials.json"
+
+          # Run the channel deploy command
           npx firebase-tools@15.22.1 hosting:channel:deploy pr-${{ github.event.number }} \
             --project ${{ vars.GCP_PROJECT_ID }} \
             --expires 7d
+
+          # Clean up the key
+          rm firebase-credentials.json
