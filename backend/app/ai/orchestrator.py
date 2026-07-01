@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from typing import Annotated, List, TypedDict
 
+import psycopg.errors
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
@@ -44,10 +45,24 @@ _base_llm = ChatGoogleGenerativeAI(
 
 
 # Async PG connection pool  (singleton)
+# max_idle=300 keeps connections below Cloud SQL's ~10-min idle-kill threshold.
+# max_lifetime=3600 forces periodic recycling to avoid silent server-side resets.
+# TCP keepalives let the OS detect severed connections before the next query.
 _pool = AsyncConnectionPool(
     conninfo=settings.DATABASE_URL,
-    kwargs={"autocommit": True, "prepare_threshold": 0},
+    kwargs={
+        "autocommit": True,
+        "prepare_threshold": 0,
+        "keepalives": 1,
+        "keepalives_idle": 60,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    },
+    min_size=2,
     max_size=20,
+    max_idle=300,
+    max_lifetime=3600,
+    reconnect_timeout=30,
     open=False,  # opened in startup()
 )
 
@@ -279,16 +294,24 @@ async def run_chat(user_input: str, user, session_id: str) -> str:
     config = {"configurable": {"thread_id": sid}}
     t_start = time.time()
 
-    result = await graph.ainvoke(
-        {
-            "messages": [HumanMessage(content=user_input)],
-            "user_context": {
-                "employee_id": str(user.id),
-                "employee_name": user.full_name,
-            },
+    invoke_payload = {
+        "messages": [HumanMessage(content=user_input)],
+        "user_context": {
+            "employee_id": str(user.id),
+            "employee_name": user.full_name,
         },
-        config=config,
-    )
+    }
+
+    for attempt in range(2):
+        try:
+            result = await graph.ainvoke(invoke_payload, config=config)
+            break
+        except psycopg.errors.AdminShutdown:
+            if attempt == 0:
+                print("[run_chat] DB connection terminated by server, retrying once…")
+                await asyncio.sleep(0.5)
+            else:
+                raise
 
     print(f"[run_chat] Total time: {time.time() - t_start:.2f}s")
     return _safe_final_text(result["messages"])
