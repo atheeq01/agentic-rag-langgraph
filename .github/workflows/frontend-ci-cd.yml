@@ -125,14 +125,10 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Update ADC for Firebase CLI
-        run: |
-          gcloud auth login --quiet --cred-file="$GOOGLE_APPLICATION_CREDENTIALS" --update-adc
-
       - name: Deploy to Firebase Hosting (live)
         working-directory: ./frontend
         run: |
-          npx firebase-tools deploy --only hosting --project ${{ vars.GCP_PROJECT_ID }} --non-interactive
+          npx firebase-tools@15.22.1 deploy --only hosting --project ${{ vars.GCP_PROJECT_ID }} --non-interactive
 
       - name: Update FRONTEND_URL to Latest
         run: |
@@ -172,13 +168,9 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Update ADC for Firebase CLI
-        run: |
-          gcloud auth login --quiet --cred-file="$GOOGLE_APPLICATION_CREDENTIALS" --update-adc
-
       - name: Deploy to Firebase Hosting (preview)
         working-directory: ./frontend
         run: |
-          npx firebase-tools hosting:channel:deploy pr-${{ github.event.number }} \
+          npx firebase-tools@15.22.1 hosting:channel:deploy pr-${{ github.event.number }} \
             --project ${{ vars.GCP_PROJECT_ID }} \
             --expires 7d
