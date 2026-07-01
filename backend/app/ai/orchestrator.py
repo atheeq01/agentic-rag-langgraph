@@ -235,7 +235,7 @@ async def _run_agent_loop(
 
 _graph_cache = {}
 MAX_CACHE_SIZE = 100
-GRAPH_VERSION = "v3"
+GRAPH_VERSION = "v4"
 
 # Public entry point
 async def run_chat(user_input: str, user, session_id: str) -> str:

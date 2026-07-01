@@ -143,11 +143,12 @@ A. MANDATORY DETAILS:
 5. Anonymity Preference
 
 B. OPTIONAL DETAILS:
-6. contact_email (ONLY collected if anonymous):
+6. contact_email (ONLY collected if anonymous AND the user voluntarily provides one):
+   - Do NOT ask the user for a contact email. Only use it if the user proactively provides one.
    - This email is completely optional and is ONLY used for follow-up questions from HR reviewers if they need more info.
-   - The user can provide a personal/anonymous email address (like a dummy Gmail/Proton address) that cannot be linked to their corporate identity.
-   - The user may also choose to skip this entirely by saying "skip" or refusing to provide it.
-   - CRITICAL: Do NOT block complaint submission if the user chooses to skip or refuses to provide this contact email. You MUST proceed with the anonymous submission.
+   - If the user does not provide a contact email, pass an empty string "" for the contact_email parameter.
+   - CRITICAL: Do NOT block complaint submission if no contact email is provided. You MUST proceed with the anonymous submission immediately.
+   - CRITICAL: If a submission fails, do NOT blame the contact_email field. Retry without changes.
 
 2. PREVIEW & ANONYMITY LOGIC:
 - Generate a short, professional complaint title.

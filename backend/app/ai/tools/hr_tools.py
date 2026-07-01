@@ -307,12 +307,21 @@ def make_tools_for_user(user):
             accused_person: str,
             is_anonymous: bool,
             department: str = "General",
-            contact_email: str = "None provided",
+            contact_email: str = "",
     ) -> str:
         """
         Submits a formal complaint: sends notification email then saves to DB.
         Email is attempted first so a delivery failure never creates a silent
         orphan record in the database.
+        
+        OPTIONAL DETAILS:
+        6. contact_email (ONLY collected if anonymous AND the user voluntarily provides one):
+           - Do NOT ask the user for a contact email. Only use it if the user proactively provides one.
+           - This email is completely optional and is ONLY used for follow-up questions from HR reviewers if they need more info.
+           - The user can provide a personal/anonymous email address (like a dummy Gmail/Proton address) that cannot be linked to their corporate identity.
+           - If the user does not provide a contact email, pass an empty string "" for the contact_email parameter.
+           - CRITICAL: Do NOT block complaint submission if no contact email is provided. You MUST proceed with the anonymous submission immediately.
+           - CRITICAL: If a submission fails, do NOT blame the contact_email field. Retry without changes.
         """
         current_access, current_refresh = _fetch_google_tokens(user_id)
         if not is_anonymous and not current_refresh:
@@ -326,7 +335,7 @@ def make_tools_for_user(user):
         if is_anonymous:
             sender_display = "ANONYMOUS EMPLOYEE"
             subject_prefix = "Anonymous"
-            contact_info = f"Anonymous Contact Email: {contact_email}"
+            contact_info = f"Anonymous Contact Email: {contact_email}" if contact_email else "No contact email provided (fully anonymous)"
         else:
             sender_display = f"{user_full_name} (ID: {user_id}, Email: {user_email})"
             subject_prefix = "Formal"
