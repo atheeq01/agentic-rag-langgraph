@@ -113,10 +113,8 @@ jobs:
           path: frontend/dist
 
       - name: Authenticate to Google Cloud
-        id: auth
         uses: google-github-actions/auth@v3
         with:
-          token_format: 'access_token'
           project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -126,8 +124,6 @@ jobs:
 
       - name: Deploy to Firebase Hosting (live)
         working-directory: ./frontend
-        env:
-          GOOGLE_OAUTH_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           npx firebase-tools deploy --only hosting --project ${{ vars.GCP_PROJECT_ID }} --non-interactive
 
@@ -158,10 +154,8 @@ jobs:
           path: frontend/dist
 
       - name: Authenticate to Google Cloud
-        id: auth
         uses: google-github-actions/auth@v3
         with:
-          token_format: 'access_token'
           project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -171,8 +165,6 @@ jobs:
 
       - name: Deploy to Firebase Hosting (preview)
         working-directory: ./frontend
-        env:
-          GOOGLE_OAUTH_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           npx firebase-tools hosting:channel:deploy pr-${{ github.event.number }} \
             --project ${{ vars.GCP_PROJECT_ID }} \
