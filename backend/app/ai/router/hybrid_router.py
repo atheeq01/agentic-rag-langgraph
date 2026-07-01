@@ -75,11 +75,14 @@ def semantic_router(state):
             "would you like me to proceed",
             "complaint to hr",
             "formal complaint",
+            "incident",
+            "anonymous",
+            "anonymity",
+            "harassment",
+            "bullying",
+            "grievance",
         ]
-        if any(kw in last_ai_lower for kw in complaint_continuation_signals):
-            print("[Router] Continuation → COMPLAINT_AGENT")
-            return Command(goto="complaint_agent")
-
+        
         # Signals that the leave agent is mid-flow or awaiting confirmation
         leave_continuation_signals = [
             "dates",
@@ -92,8 +95,39 @@ def semantic_router(state):
             "gmail connected",
             "submit my leave",
             "proceed and submit",
+            "leave type",
         ]
-        if any(kw in last_ai_lower for kw in leave_continuation_signals):
+
+        is_complaint_continuation = any(kw in last_ai_lower for kw in complaint_continuation_signals)
+        is_leave_continuation = any(kw in last_ai_lower for kw in leave_continuation_signals)
+
+        # Disambiguate overlapping or generic continuation indicators
+        if is_complaint_continuation and is_leave_continuation:
+            # Score based on keyword counts to see which flow is more dominant
+            comp_count = sum(last_ai_lower.count(kw) for kw in ["complaint", "incident", "harassment", "bullying", "grievance", "accused"])
+            leave_count = sum(last_ai_lower.count(kw) for kw in ["leave", "vacation", "pto", "annual", "sick"])
+            if comp_count > leave_count:
+                is_leave_continuation = False
+            else:
+                is_complaint_continuation = False
+
+        if not is_complaint_continuation and not is_leave_continuation:
+            if "would you like me to proceed" in last_ai_lower or "proceed" in last_ai_lower:
+                # Scan further back to see which topic was discussed
+                for msg in reversed(history_to_check):
+                    if getattr(msg, "type", "") == "ai":
+                        prev_ai_lower = safe_extract_text(msg.content)
+                        if any(kw in prev_ai_lower for kw in ["complaint", "harassment", "bullying", "incident", "anonymous", "grievance"]):
+                            is_complaint_continuation = True
+                            break
+                        if any(kw in prev_ai_lower for kw in ["leave", "vacation", "pto", "annual", "sick"]):
+                            is_leave_continuation = True
+                            break
+
+        if is_complaint_continuation:
+            print("[Router] Continuation → COMPLAINT_AGENT")
+            return Command(goto="complaint_agent")
+        elif is_leave_continuation:
             print("[Router] Continuation → LEAVE_AGENT")
             return Command(goto="leave_agent")
 
