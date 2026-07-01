@@ -58,6 +58,7 @@ def upload_and_process_document(db: Session, file: UploadFile, user_id: uuid.UUI
         for chunk in chunks:
             chunk.metadata["document_id"] = str(doc_id)
             chunk.metadata["filename"] = file.filename
+            chunk.metadata["allowed_roles"] = ["all"]
 
         get_vector_store().add_documents(chunks)
 
