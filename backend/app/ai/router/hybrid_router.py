@@ -45,6 +45,27 @@ def semantic_router(state):
     if last_ai_msg:
         last_ai_lower = last_ai_msg.lower()
 
+        # After Google auth connection the last AI content is the bare sentinel
+        # "GOOGLE_AUTH_REQUIRED". Look back at which tool triggered it so we can
+        # resume the correct agent instead of falling through to the default.
+        if "google_auth_required" in last_ai_lower:
+            leave_tools   = {"apply_leave_tool"}
+            complaint_tools = {"submit_formal_complaint"}
+            for msg in reversed(history_to_check):
+                if getattr(msg, "type", "") == "ai":
+                    tcs = getattr(msg, "tool_calls", []) or []
+                    for tc in tcs:
+                        name = tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
+                        if name in leave_tools:
+                            print("[Router] Post-auth continuation → LEAVE_AGENT")
+                            return Command(goto="leave_agent")
+                        if name in complaint_tools:
+                            print("[Router] Post-auth continuation → COMPLAINT_AGENT")
+                            return Command(goto="complaint_agent")
+            # No tool match found — most common post-auth scenario is leave
+            print("[Router] Post-auth default → LEAVE_AGENT")
+            return Command(goto="leave_agent")
+
         # Signals that the complaint agent is mid-flow or awaiting confirmation
         complaint_continuation_signals = [
             "anonymously",

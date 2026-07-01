@@ -1,5 +1,6 @@
 import base64
 import smtplib
+import uuid as _uuid_mod
 from datetime import datetime, date
 from email.message import EmailMessage
 import zoneinfo
@@ -8,6 +9,25 @@ def _get_today(user_timezone: str = "Asia/Colombo") -> date:
     """Return today's date in the user's local timezone."""
     tz = zoneinfo.ZoneInfo(user_timezone)
     return datetime.now(tz).date()
+
+
+def _fetch_google_tokens(user_id: str) -> tuple[str | None, str | None]:
+    """
+    Re-fetch Google tokens from the DB on every call so tools work correctly
+    even when the user connects Google after the graph was first compiled for
+    their session (graph cache captures stale closure values otherwise).
+    Returns (access_token_enc, refresh_token_enc).
+    """
+    from app.db.session import SessionLocal
+    from app.models.user import User
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.id == _uuid_mod.UUID(user_id)).first()
+        if u:
+            return u.google_access_token, u.google_refresh_token
+        return None, None
+    finally:
+        db.close()
 
 from fastapi import HTTPException
 from google.auth.transport.requests import Request
@@ -82,12 +102,14 @@ def make_tools_for_user(user):
     LangGraph calls the tools after the request session has closed.
     """
     # ── Snapshot user attributes as plain Python scalars ──────────────────
-    user_id             = str(user.id)
-    user_role           = str(user.role)
-    user_email          = str(user.email)
-    user_full_name      = str(user.full_name or "")
-    user_google_refresh = user.google_refresh_token  
-    user_google_access  = user.google_access_token
+    # Google tokens are NOT snapshotted here — _fetch_google_tokens() reads
+    # them fresh from the DB on each tool call so that tokens acquired after
+    # this graph was compiled (e.g. after the Google OAuth connect flow) are
+    # immediately visible without requiring a cache eviction.
+    user_id        = str(user.id)
+    user_role      = str(user.role)
+    user_email     = str(user.email)
+    user_full_name = str(user.full_name or "")
     # ──────────────────────────────────────────────────────────────────────
 
   #  Individual tool implementations (closures over plain scalars)         
@@ -199,7 +221,9 @@ def make_tools_for_user(user):
 
         db = SessionLocal()
         try:
-            if send_email and not user_google_refresh:
+            # Re-fetch tokens so we see tokens acquired after this graph was compiled
+            current_access, current_refresh = _fetch_google_tokens(user_id)
+            if send_email and not current_refresh:
                 return "Failed: GOOGLE_AUTH_REQUIRED. You must connect your Gmail to submit this request."
 
             leave_data = LeaveCreate(
@@ -210,10 +234,10 @@ def make_tools_for_user(user):
             )
             # Apply leave but do not commit yet (hold transaction)
             leave = leave_service.apply_leave(db, user_id=user_id, leave_in=leave_data, commit=False)
-            
+
             if send_email:
                 try:
-                    service = get_gmail_service(user_id, user_google_access, user_google_refresh)
+                    service = get_gmail_service(user_id, current_access, current_refresh)
                     message = EmailMessage()
                     message.set_content(body)
                     message["To"] = recipient
@@ -247,7 +271,8 @@ def make_tools_for_user(user):
             recipient: str, subject: str, body: str, is_confirmed: bool = False
     ) -> str:
         """Draft and send an email using the user's personal Gmail account."""
-        if not user_google_refresh:
+        current_access, current_refresh = _fetch_google_tokens(user_id)
+        if not current_refresh:
             return (
                 "GOOGLE_AUTH_REQUIRED "
                 "Tell the user: 'You need to connect your Gmail to send requests. "
@@ -261,7 +286,7 @@ def make_tools_for_user(user):
             )
 
         try:
-            service = get_gmail_service(user_id, user_google_access, user_google_refresh)
+            service = get_gmail_service(user_id, current_access, current_refresh)
             message = EmailMessage()
             message.set_content(body)
             message["To"] = recipient
@@ -289,7 +314,8 @@ def make_tools_for_user(user):
         Email is attempted first so a delivery failure never creates a silent
         orphan record in the database.
         """
-        if not is_anonymous and not user_google_refresh:
+        current_access, current_refresh = _fetch_google_tokens(user_id)
+        if not is_anonymous and not current_refresh:
             return (
                 "GOOGLE_AUTH_REQUIRED "
                 "Tell the user they must connect their Google account to submit "
@@ -328,7 +354,7 @@ def make_tools_for_user(user):
                     server.login(SYSTEM_EMAIL_ADDRESS, SYSTEM_EMAIL_APP_PASSWORD)
                     server.send_message(message)
             else:
-                service = get_gmail_service(user_id, user_google_access, user_google_refresh)
+                service = get_gmail_service(user_id, current_access, current_refresh)
                 message = EmailMessage()
                 message.set_content(body)
                 message["To"] = HR_DEPARTMENT_EMAIL
